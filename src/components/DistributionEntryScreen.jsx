@@ -34,8 +34,8 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
     addDistribution
   } = useZakat();
 
-  // Selected beneficiary & search state
-  const [selectedBenId, setSelectedBenId] = useState(beneficiaries[0]?.id || '');
+  // Selected beneficiary & search state (defaults to blank so user explicitly selects)
+  const [selectedBenId, setSelectedBenId] = useState('');
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
   const [comboboxSearch, setComboboxSearch] = useState('');
   const comboboxRef = useRef(null);
@@ -61,9 +61,10 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Selected Beneficiary Data
+  // Selected Beneficiary Data (null when blank)
   const selectedBeneficiary = useMemo(() => {
-    return beneficiaries.find(b => b.id === selectedBenId) || beneficiaries[0];
+    if (!selectedBenId) return null;
+    return beneficiaries.find(b => b.id === selectedBenId) || null;
   }, [beneficiaries, selectedBenId]);
 
   // Check if this beneficiary has an existing disbursement in the selected entryYear
@@ -115,6 +116,11 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
 
   // Save handler - Direct payout
   const handleSave = (instantPaid = false) => {
+    if (!selectedBeneficiary) {
+      alert('Please select a recipient from the beneficiary directory first.');
+      return;
+    }
+
     const numAmount = Number(amountAllocated);
     if (isNaN(numAmount) || numAmount <= 0) {
       alert('Please enter a valid amount (e.g. ₹ 10,000)');
@@ -141,14 +147,16 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
 
     addDistribution(newEntry);
 
-    setSuccessMessage(`Disbursement recorded for ${selectedBeneficiary.fullName} as [${finalStatus}]!`);
+    // Reset form fields
+    setSelectedBenId('');
     setAmountAllocated('');
     setRemarks('');
     setPaymentStatus('Not Paid');
 
-    setTimeout(() => {
-      setSuccessMessage('');
-    }, 4500);
+    // Immediately redirect to the distribution ledger list screen as requested
+    if (setActiveTab) {
+      setActiveTab('ledger');
+    }
   };
 
   return (
@@ -200,26 +208,34 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
             className="w-full bg-slate-50 border border-slate-300 hover:border-blue-400 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 font-medium cursor-pointer flex items-center justify-between transition-all"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <User className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="font-bold truncate text-slate-900">
-                {selectedBeneficiary?.fullName || 'Select Beneficiary...'}
+              <User className={`w-4 h-4 shrink-0 ${selectedBeneficiary ? 'text-blue-600' : 'text-slate-400'}`} />
+              <span className={`font-bold truncate ${selectedBeneficiary ? 'text-slate-900' : 'text-slate-400 font-normal'}`}>
+                {selectedBeneficiary ? selectedBeneficiary.fullName : '-- Select Recipient Profile (Search by Name or Category) --'}
               </span>
-              <span className="text-slate-400 text-xs hidden sm:inline">
-                • {selectedBeneficiary?.classification}
-              </span>
+              {selectedBeneficiary && (
+                <span className="text-slate-400 text-xs hidden sm:inline">
+                  • {selectedBeneficiary.classification}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {isAlreadyPaidInYear ? (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  ✓ PAID IN FY {entryYear}
-                </span>
-              ) : existingYearDistribution ? (
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                  ⏳ PENDING IN FY {entryYear}
-                </span>
+              {selectedBeneficiary ? (
+                isAlreadyPaidInYear ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    ✓ PAID IN FY {entryYear}
+                  </span>
+                ) : existingYearDistribution ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                    ⏳ PENDING IN FY {entryYear}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] text-slate-500 bg-slate-100">
+                    No allocation yet in FY {entryYear}
+                  </span>
+                )
               ) : (
-                <span className="px-2 py-0.5 rounded text-[10px] text-slate-500 bg-slate-100">
-                  No allocation yet in FY {entryYear}
+                <span className="px-2 py-0.5 rounded text-[10px] text-slate-400 bg-slate-100">
+                  Click to select
                 </span>
               )}
               <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -339,8 +355,8 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
           </div>
         )}
 
-        {/* Selected Profile Details Card */}
-        {selectedBeneficiary && (
+        {/* Selected Profile Details Card or Blank Prompt */}
+        {selectedBeneficiary ? (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -401,6 +417,14 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
               </p>
             )}
           </div>
+        ) : (
+          <div className="bg-slate-50/60 border border-dashed border-slate-200 rounded-xl p-5 text-center text-slate-400 text-xs">
+            <User className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+            <span className="font-semibold text-slate-600">No Recipient Selected</span>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Please choose a recipient from the directory search box above to view profile details and grant history.
+            </p>
+          </div>
         )}
       </div>
 
@@ -415,8 +439,13 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        {!selectedBeneficiary ? (
+          <div className="py-6 text-center text-slate-400 text-xs bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+            Please choose a recipient in Step 1 to inspect their past payout records across all financial years.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] border-b border-slate-200">
               <tr>
                 <th className="py-2.5 px-3">Financial Year</th>
@@ -526,6 +555,7 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* STEP 3: FINANCIAL DETAILS & ONE-CLICK DISBURSEMENT */}
