@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR } from '../utils/formatters';
 import {
   Settings2,
@@ -36,6 +37,8 @@ export const MasterManagementScreen = () => {
     aurangabadRationList,
     financialYear
   } = useZakat();
+
+  const { isAuditor, isReadOnly } = useAuth();
 
   const [activeSubTab, setActiveSubTab] = useState('categories');
 
@@ -263,13 +266,15 @@ export const MasterManagementScreen = () => {
         <div className="space-y-4 animate-fadeIn">
           <div className="flex justify-between items-center">
             <span className="text-xs text-slate-500 font-medium">Standardized Zakat & Sadqa budget envelope classifications</span>
-            <button
-              onClick={() => setShowCatModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Category</span>
-            </button>
+            {!isAuditor && !isReadOnly && (
+              <button
+                onClick={() => setShowCatModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Category</span>
+              </button>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
@@ -313,22 +318,26 @@ export const MasterManagementScreen = () => {
                     <td className="py-3 px-3.5 text-slate-700">{c.defaultAccountName}</td>
                     <td className="py-3 px-3.5 text-slate-500 max-w-xs truncate">{c.description}</td>
                     <td className="py-3 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => setEditingCategory({ ...c })}
-                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
-                          title="Edit Category"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(c)}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                          title="Delete Category"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {isAuditor || isReadOnly ? (
+                        <span className="text-[11px] text-slate-400 italic font-medium">Read-Only</span>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setEditingCategory({ ...c })}
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
+                            title="Edit Category"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(c)}
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+                            title="Delete Category"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -343,13 +352,15 @@ export const MasterManagementScreen = () => {
         <div className="space-y-4 animate-fadeIn">
           <div className="flex justify-between items-center">
             <span className="text-xs text-slate-500 font-medium">Bank accounts from which payments are disbursed</span>
-            <button
-              onClick={() => setShowAccModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Funding Account</span>
-            </button>
+            {!isAuditor && !isReadOnly && (
+              <button
+                onClick={() => setShowAccModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Funding Account</span>
+              </button>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
@@ -383,22 +394,26 @@ export const MasterManagementScreen = () => {
                       {formatINR(a.balance)}
                     </td>
                     <td className="py-3 px-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => setEditingAccount({ ...a })}
-                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
-                          title="Edit Account"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAccount(a)}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                          title="Delete Account"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {isAuditor || isReadOnly ? (
+                        <span className="text-[11px] text-slate-400 italic font-medium">Read-Only</span>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setEditingAccount({ ...a })}
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
+                            title="Edit Account"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAccount(a)}
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+                            title="Delete Account"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -413,13 +428,15 @@ export const MasterManagementScreen = () => {
         <div className="space-y-4 animate-fadeIn">
           <div className="flex justify-between items-center">
             <span className="text-xs text-slate-500 font-medium">Internal coordinators and employees who refer and verify applicants</span>
-            <button
-              onClick={() => setShowRefModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Coordinator</span>
-            </button>
+            {!isAuditor && !isReadOnly && (
+              <button
+                onClick={() => setShowRefModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Coordinator</span>
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -444,22 +461,24 @@ export const MasterManagementScreen = () => {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setEditingRefPerson({ ...r })}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors"
-                  >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Edit</span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteReference(r)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Delete</span>
-                  </button>
-                </div>
+                {!isAuditor && !isReadOnly && (
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setEditingRefPerson({ ...r })}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReference(r)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

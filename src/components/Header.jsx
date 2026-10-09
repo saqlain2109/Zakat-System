@@ -38,11 +38,11 @@ export const Header = ({
     isCTO,
     isAdmin,
     isFinance,
-    setIsLoginModalOpen,
+    isAuditor,
+    isReadOnly,
+    permissions,
     setIsProfileModalOpen,
-    setIs2FASetupModalOpen,
     setIsUserManagementModalOpen,
-    setTarget2FAUser,
     logout
   } = useAuth();
 
@@ -75,13 +75,13 @@ export const Header = ({
   const getRoleBadge = (role) => {
     switch (role) {
       case 'cto':
-        return { label: 'CTO', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+        return { label: 'CTO Approver', bg: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
       case 'admin':
-        return { label: 'Admin', bg: 'bg-purple-100 text-purple-800 border-purple-200' };
+        return { label: 'Admin Trustee', bg: 'bg-purple-100 text-purple-800 border-purple-200' };
       case 'finance':
-        return { label: 'Finance', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+        return { label: 'Finance Officer', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
       default:
-        return { label: 'Auditor', bg: 'bg-slate-100 text-slate-800 border-slate-200' };
+        return { label: 'Auditor (Read-Only)', bg: 'bg-slate-100 text-slate-800 border-slate-200' };
     }
   };
 
@@ -154,8 +154,8 @@ export const Header = ({
             </select>
           </div>
 
-          {/* New Payout Action */}
-          {activeTab !== 'entry-form' && (
+          {/* New Payout Action - Hidden for Auditor */}
+          {activeTab !== 'entry-form' && !isAuditor && !isReadOnly && (
             <button
               onClick={() => setActiveTab('entry-form')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
@@ -236,18 +236,6 @@ export const Header = ({
                   >
                     <KeyRound className="w-4 h-4 text-emerald-600" />
                     <span>My Profile & Security</span>
-                  </button>
-
-                  {/* Switch Account */}
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      setIsLoginModalOpen(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium"
-                  >
-                    <User className="w-4 h-4 text-blue-600" />
-                    <span>Switch User / Quick Login</span>
                   </button>
 
                   {/* Admin User Management */}

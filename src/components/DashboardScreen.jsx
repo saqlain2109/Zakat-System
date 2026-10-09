@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR, formatCompactINR, formatPercent, exportToCSV } from '../utils/formatters';
 import {
   Wallet,
@@ -46,6 +47,8 @@ export const DashboardScreen = ({ setActiveTab, onOpenYearModal }) => {
     toggleDistributionPaid,
     multiYearArchive
   } = useZakat();
+
+  const { isAuditor, isReadOnly } = useAuth();
 
   const [viewMode, setViewMode] = useState('consolidated'); // 'consolidated' or 'drilldown'
   const [expandedCategories, setExpandedCategories] = useState({});
@@ -108,16 +111,18 @@ export const DashboardScreen = ({ setActiveTab, onOpenYearModal }) => {
               <span>Years & Rollover</span>
             </button>
           )}
-          <button
-            onClick={() => {
-              setOverrideInput(plannedAnnualBudget);
-              setShowOverrideModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs"
-          >
-            <Settings className="w-3.5 h-3.5 text-amber-600" />
-            <span>Target Budget</span>
-          </button>
+          {!isAuditor && !isReadOnly && (
+            <button
+              onClick={() => {
+                setOverrideInput(plannedAnnualBudget);
+                setShowOverrideModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-600" />
+              <span>Target Budget</span>
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition-colors shadow-2xs"
@@ -125,13 +130,15 @@ export const DashboardScreen = ({ setActiveTab, onOpenYearModal }) => {
             <Download className="w-3.5 h-3.5 text-slate-600" />
             <span>Export CSV</span>
           </button>
-          <button
-            onClick={() => setActiveTab('entry-form')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Payout</span>
-          </button>
+          {!isAuditor && !isReadOnly && (
+            <button
+              onClick={() => setActiveTab('entry-form')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Payout</span>
+            </button>
+          )}
         </div>
       </div>
 

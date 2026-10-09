@@ -23,8 +23,8 @@ export const LoginScreen = () => {
     verifyLogin2FA
   } = useAuth();
 
-  const [email, setEmail] = useState('akbar@almeezan.org');
-  const [password, setPassword] = useState('Akbar@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -78,15 +78,7 @@ export const LoginScreen = () => {
     }
   };
 
-  const handleQuickSelect = (u) => {
-    const pw = u.role === 'cto' ? 'Akbar@123' :
-      u.role === 'admin' ? 'Admin@123' :
-      u.role === 'finance' ? 'Finance@123' : 'Auditor@123';
-    setEmail(u.email);
-    setPassword(pw);
-    setErrorMsg('');
-    setIs2FAStep(false);
-  };
+
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
@@ -250,49 +242,6 @@ export const LoginScreen = () => {
               </div>
             </form>
           )}
-
-          {/* Quick Demo Accounts Selection */}
-          <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-              <span className="flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Quick Role Login (Click to switch):</span>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {users.map(u => {
-                const isSelected = email.toLowerCase() === u.email.toLowerCase();
-                const roleBadge = u.role === 'cto' ? 'CTO Akbar' :
-                  u.role === 'admin' ? 'Trustee Admin' :
-                  u.role === 'finance' ? 'Finance Team' : 'Auditor';
-
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => handleQuickSelect(u)}
-                    className={`p-2 rounded-xl text-left border transition-all flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-xs'
-                        : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/70 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="font-bold truncate text-[11px]">{u.name}</div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[10px] text-blue-400 font-semibold">{roleBadge}</span>
-                      {u.twoFactorEnabled && (
-                        <span className="text-[9px] text-emerald-400 flex items-center gap-0.5" title="2FA Active">
-                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                          <span>2FA</span>
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         {/* Footer Note */}

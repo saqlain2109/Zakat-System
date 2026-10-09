@@ -13,7 +13,6 @@ import { ZakatAssistantBot } from './components/ZakatAssistantBot';
 import { RecycleBinModal } from './components/RecycleBinModal';
 import { YearManagementModal } from './components/YearManagementModal';
 import { LoginScreen } from './components/LoginScreen';
-import { LoginModal } from './components/LoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TwoFactorSetupModal } from './components/TwoFactorSetupModal';
 import { UserManagementModal } from './components/UserManagementModal';
@@ -105,12 +104,6 @@ function MainApp() {
       <YearManagementModal
         isOpen={isYearModalOpen}
         onClose={() => setIsYearModalOpen(false)}
-      />
-
-      {/* Authentication & User Switch Modal */}
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
       />
 
       {/* User Profile, Password & 2FA Settings Modal */}

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR, exportToCSV, exportToExcel, printReport } from '../utils/formatters';
 import {
   Users2,
@@ -112,6 +113,8 @@ export const BeneficiaryDirectoryScreen = ({ setActiveTab }) => {
     deleteBeneficiary,
     checkDuplicates
   } = useZakat();
+
+  const { isAuditor, isReadOnly } = useAuth();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -400,13 +403,15 @@ export const BeneficiaryDirectoryScreen = ({ setActiveTab }) => {
             )}
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Beneficiary</span>
-          </button>
+          {!isAuditor && !isReadOnly && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Beneficiary</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -581,20 +586,24 @@ export const BeneficiaryDirectoryScreen = ({ setActiveTab }) => {
                                 >
                                   <History className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => setEditingBeneficiary({ ...b })}
-                                  className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
-                                  title="Edit Profile"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setItemToDelete(b)}
-                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                                  title="Move to Recycle Bin"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {!isAuditor && !isReadOnly && (
+                                  <>
+                                    <button
+                                      onClick={() => setEditingBeneficiary({ ...b })}
+                                      className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
+                                      title="Edit Profile"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setItemToDelete(b)}
+                                      className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+                                      title="Move to Recycle Bin"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           );

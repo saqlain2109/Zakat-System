@@ -35,7 +35,7 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
     addDistribution
   } = useZakat();
 
-  const { currentUser, isFinance, isCTO, isAdmin } = useAuth();
+  const { currentUser, isFinance, isCTO, isAdmin, isAuditor, isReadOnly } = useAuth();
 
   // Selected beneficiary & search state (defaults to blank so user explicitly selects)
   const [selectedBenId, setSelectedBenId] = useState('');
@@ -162,6 +162,36 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
       setActiveTab('ledger');
     }
   };
+
+  // Strictly block Auditor from recording new disbursements
+  if (isAuditor || isReadOnly) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto pb-12 animate-fadeIn">
+        <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center mx-auto shadow-2xs">
+            <ShieldCheck className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-slate-900">
+              Auditor Access: Read-Only Mode
+            </h2>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              As a compliance auditor, your account has strictly view-only permissions. You can inspect all disbursements, verify receipts, and review audit trails in the Ledger, but recording new disbursements is restricted to Finance officers.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={() => setActiveTab('ledger')}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5"
+            >
+              <span>View Disbursement Ledger</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">

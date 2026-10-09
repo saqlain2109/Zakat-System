@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR } from '../utils/formatters';
 import {
   Trash2,
@@ -22,6 +23,8 @@ export const RecycleBinModal = ({ isOpen, onClose }) => {
     permanentlyDeleteFromRecycleBin,
     emptyRecycleBin
   } = useZakat();
+
+  const { isAuditor, isReadOnly } = useAuth();
 
   const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'year', 'distribution', 'beneficiary'
   const [actionNotice, setActionNotice] = useState('');
@@ -155,7 +158,7 @@ export const RecycleBinModal = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {recycleBin.length > 0 && (
+          {recycleBin.length > 0 && !(isAuditor || isReadOnly) && (
             <button
               onClick={handleEmptyAll}
               className="text-xs text-rose-600 hover:text-rose-800 font-semibold hover:underline flex items-center gap-1"
@@ -215,21 +218,29 @@ export const RecycleBinModal = ({ isOpen, onClose }) => {
 
                 {/* Restore & Purge Actions */}
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  <button
-                    onClick={() => handleRestore(item)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition-colors shadow-2xs"
-                    title="Restore record to active database"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Restore</span>
-                  </button>
-                  <button
-                    onClick={() => handlePermanentDelete(item)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title="Permanently Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {!(isAuditor || isReadOnly) ? (
+                    <>
+                      <button
+                        onClick={() => handleRestore(item)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+                        title="Restore record to active database"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Restore</span>
+                      </button>
+                      <button
+                        onClick={() => handlePermanentDelete(item)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Permanently Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                      Audit Inspection Only
+                    </span>
+                  )}
                 </div>
               </div>
             ))

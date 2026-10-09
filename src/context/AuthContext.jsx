@@ -9,22 +9,22 @@ export const SYSTEM_ROLES = [
   {
     id: 'cto',
     label: 'CTO (Akbar Hussain)',
-    description: 'Full access to all menus, create disbursements, and exclusive authority to Authorize/Reject Finance payout requests.'
+    description: 'Full access to all modules, create disbursements, and exclusive authority to Authorize/Reject payout requests.'
   },
   {
     id: 'admin',
     label: 'Admin (Managing Trustee)',
-    description: 'Full administrative access, user directory management, and authority to Reset / Remove user 2-Step Verification.'
+    description: 'Full administrative access, user directory management, and authority to configure security and 2FA.'
   },
   {
     id: 'finance',
-    label: 'Finance / Accounts (Farheen)',
-    description: 'Create new payout requests. Payouts require CTO authorization before funds can be marked as Paid.'
+    label: 'Finance / Accounts',
+    description: 'Create new payout requests. Payouts require CTO authorization before funds can be disbursed.'
   },
   {
-    id: 'viewer',
-    label: 'Auditor (Read-Only Viewer)',
-    description: 'Inspect reports, audit trails, and ledgers with read-only access.'
+    id: 'auditor',
+    label: 'Auditor (Strictly Read-Only)',
+    description: 'Inspect all financial records, audit trails, ledgers, and reports. Strictly restricted from adding, modifying, or deleting any data.'
   }
 ];
 
@@ -382,15 +382,22 @@ export const AuthProvider = ({ children }) => {
   const isCTO = currentUser?.role === 'cto';
   const isAdmin = currentUser?.role === 'admin';
   const isFinance = currentUser?.role === 'finance';
-  const isViewer = currentUser?.role === 'viewer';
+  const isAuditor = currentUser?.role === 'auditor' || currentUser?.role === 'viewer';
+  const isViewer = isAuditor;
+  const isReadOnly = isAuditor;
 
   const permissions = {
-    canApprovePayouts: isCTO || isAdmin,
-    canCreatePayouts: !isViewer,
-    canDirectPay: isCTO || isAdmin,
-    canManageUsers: isAdmin,
-    canManageMasters: isCTO || isAdmin,
-    isReadOnly: isViewer
+    canApprovePayouts: (isCTO || isAdmin) && !isReadOnly,
+    canCreatePayouts: !isReadOnly,
+    canEditPayouts: !isReadOnly,
+    canDelete: (isAdmin || isCTO) && !isReadOnly,
+    canDirectPay: (isCTO || isAdmin) && !isReadOnly,
+    canManageUsers: isAdmin && !isReadOnly,
+    canManageMasters: (isAdmin || isCTO) && !isReadOnly,
+    canManageYears: (isAdmin || isCTO) && !isReadOnly,
+    canRestoreRecycleBin: !isReadOnly,
+    isReadOnly,
+    isAuditor
   };
 
   return (
@@ -415,6 +422,8 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         isFinance,
         isViewer,
+        isAuditor,
+        isReadOnly,
         // Modals
         isLoginModalOpen,
         setIsLoginModalOpen,

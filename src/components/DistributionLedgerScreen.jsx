@@ -62,7 +62,7 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
     pendingApprovalCount
   } = useZakat();
 
-  const { currentUser, isCTO, isAdmin, isFinance, permissions } = useAuth();
+  const { currentUser, isCTO, isAdmin, isFinance, isAuditor, isReadOnly, permissions } = useAuth();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -567,6 +567,24 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
                           );
                         }
                         if (col.id === 'actions') {
+                          // Auditor View: Strictly Read-Only Audit History
+                          if (isAuditor || isReadOnly) {
+                            return (
+                              <td key={col.id} className="py-3 px-3.5 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => setHistoryRecord({ id: item.id, title: `${item.beneficiaryName} (${item.classification})` })}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                                    title="View Complete Audit Trail & Changes"
+                                  >
+                                    <History className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>Audit Log</span>
+                                  </button>
+                                </div>
+                              </td>
+                            );
+                          }
+
                           return (
                             <td key={col.id} className="py-3 px-3.5 text-center">
                               <div className="flex items-center justify-center gap-1.5">

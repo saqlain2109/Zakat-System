@@ -29,7 +29,7 @@ export const YearManagementModal = ({ isOpen, onClose }) => {
     setCustomAnnualBudget
   } = useZakat();
 
-  const { currentUser } = useAuth();
+  const { currentUser, isAuditor, isReadOnly } = useAuth();
 
   const [newYearInput, setNewYearInput] = useState(financialYear + 1);
   const [newYearNotes, setNewYearNotes] = useState('');
@@ -86,17 +86,19 @@ export const YearManagementModal = ({ isOpen, onClose }) => {
           >
             All Years ({zakatYears.length})
           </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'create'
-                ? 'border-blue-600 text-blue-700 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create New Assessment Year</span>
-          </button>
+          {!(isAuditor || isReadOnly) && (
+            <button
+              onClick={() => setActiveTab('create')}
+              className={`pb-2.5 border-b-2 transition-colors flex items-center gap-1.5 ${
+                activeTab === 'create'
+                  ? 'border-blue-600 text-blue-700 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create New Assessment Year</span>
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
@@ -176,7 +178,7 @@ export const YearManagementModal = ({ isOpen, onClose }) => {
                         )}
 
                         {/* Delete Year Button (Safe to Recycle Bin) */}
-                        {zakatYears.length > 1 && (
+                        {zakatYears.length > 1 && !(isAuditor || isReadOnly) && (
                           <button
                             type="button"
                             onClick={() => {
@@ -203,32 +205,39 @@ export const YearManagementModal = ({ isOpen, onClose }) => {
               {/* Adjust Target Budget for active year */}
               <div className="pt-4 border-t border-slate-200">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Adjust Target Budget for FY {financialYear}
+                  Target Budget for FY {financialYear}
                 </h4>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      value={targetBudgetInput}
-                      onChange={(e) => setTargetBudgetInput(Number(e.target.value))}
-                      className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                {!(isAuditor || isReadOnly) ? (
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        value={targetBudgetInput}
+                        onChange={(e) => setTargetBudgetInput(Number(e.target.value))}
+                        className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (Number(targetBudgetInput) > 0) {
+                          setCustomAnnualBudget(Number(targetBudgetInput));
+                          alert(`Target budget for FY ${financialYear} updated to ${formatINR(targetBudgetInput)}`);
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                    >
+                      Save Target
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (Number(targetBudgetInput) > 0) {
-                        setCustomAnnualBudget(Number(targetBudgetInput));
-                        alert(`Target budget for FY ${financialYear} updated to ${formatINR(targetBudgetInput)}`);
-                      }
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
-                  >
-                    Save Target
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <span className="text-xs text-slate-500 font-medium">Assigned Budget Target</span>
+                    <span className="text-sm font-mono font-bold text-slate-800">{formatINR(plannedAnnualBudget)}</span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

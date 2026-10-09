@@ -16,7 +16,7 @@ import {
   BarChart3,
   Trash2,
   UserCog,
-  LogIn,
+  LogOut,
   X
 } from 'lucide-react';
 
@@ -39,19 +39,27 @@ export const Sidebar = ({
   const {
     currentUser,
     isAdmin,
-    setIsLoginModalOpen,
+    isAuditor,
+    isReadOnly,
+    logout,
     setIsProfileModalOpen,
     setIsUserManagementModalOpen
   } = useAuth();
 
-  const navigationItems = [
+  const allNavigationItems = [
     { id: 'dashboard', label: 'Dashboard', desc: 'Budget & Overview', icon: LayoutDashboard },
-    { id: 'entry-form', label: 'New Payout', desc: 'Record Disbursement', icon: FilePlus2 },
+    { id: 'entry-form', label: 'New Payout', desc: 'Record Disbursement', icon: FilePlus2, requiresWrite: true },
     { id: 'ledger', label: 'Disbursement Ledger', desc: 'Payments & Records', icon: Receipt },
     { id: 'beneficiaries', label: 'Beneficiary Directory', desc: 'Verified Master Profiles', icon: Users2 },
     { id: 'reports', label: 'Reports & Analytics', desc: 'Category & Year Drilldown', icon: BarChart3 },
     { id: 'masters', label: 'Master Settings', desc: 'Categories, Accounts & Refs', icon: Settings2 },
   ];
+
+  // Strictly hide New Payout creation tab for Auditor
+  const navigationItems = allNavigationItems.filter(item => {
+    if (item.requiresWrite && (isAuditor || isReadOnly)) return false;
+    return true;
+  });
 
   const handleNavClick = (id) => {
     setActiveTab(id);
@@ -183,17 +191,17 @@ export const Sidebar = ({
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[10px] font-semibold text-blue-400 uppercase">
-                    {currentUser?.role === 'cto' ? 'CTO Akbar' : currentUser?.role === 'admin' ? 'Trustee Admin' : currentUser?.role === 'finance' ? 'Finance' : 'Auditor'}
+                    {currentUser?.role === 'cto' ? 'CTO Approver' : currentUser?.role === 'admin' ? 'Trustee Admin' : currentUser?.role === 'finance' ? 'Finance' : 'Auditor (Read-Only)'}
                   </span>
                   <span className="text-slate-600">•</span>
                   {currentUser?.twoFactorEnabled ? (
                     <span className="text-[10px] text-emerald-400 flex items-center gap-0.5" title="2-Step Verification Active">
                       <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      <span>2FA Active</span>
+                      <span>2FA</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] text-amber-400 flex items-center gap-0.5" title="2-Step Verification Inactive">
-                      <ShieldAlert className="w-3 h-3 text-amber-400" />
+                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5" title="2-Step Verification Inactive">
+                      <ShieldAlert className="w-3 h-3 text-slate-400" />
                       <span>No 2FA</span>
                     </span>
                   )}
@@ -201,15 +209,16 @@ export const Sidebar = ({
               </div>
             </div>
 
+            {/* Direct Secure Sign Out Button */}
             <button
               onClick={() => {
-                setIsLoginModalOpen(true);
                 if (setIsOpen) setIsOpen(false);
+                logout();
               }}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[10px] shrink-0"
-              title="Switch User / Quick Login"
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-colors text-[10px] shrink-0"
+              title="Sign Out"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
 
