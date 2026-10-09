@@ -8,7 +8,6 @@ import {
   Receipt,
   Users2,
   Settings2,
-  RotateCcw,
   CalendarDays,
   Coins,
   ShieldCheck,
@@ -34,7 +33,6 @@ export const Sidebar = ({
     plannedAnnualBudget,
     totalZakatPaid,
     overallUtilization,
-    resetToDefaultData,
     recycleBin
   } = useZakat();
 
@@ -230,7 +228,7 @@ export const Sidebar = ({
         </div>
 
         {/* Bottom Actions */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
+        <div className="p-3 border-t border-slate-800 bg-slate-950/60">
           {/* Recycle Bin */}
           <button
             onClick={() => {
@@ -249,25 +247,6 @@ export const Sidebar = ({
               </span>
             )}
           </button>
-
-          {/* Reset Seed */}
-          <button
-            onClick={() => {
-              if (window.confirm('Reset all records to standard 2026 Excel data?')) {
-                resetToDefaultData();
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-transparent hover:bg-slate-800/60 text-slate-400 hover:text-amber-400 text-[11px] font-medium transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Demo Data</span>
-          </button>
-
-          {/* Trust badge */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span>2.5% Shariah Compliant Accounting</span>
-          </div>
         </div>
       </aside>
     </>

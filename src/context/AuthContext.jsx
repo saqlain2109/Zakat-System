@@ -80,7 +80,8 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.warn('Auth local read note:', e.message);
     }
-    return INITIAL_AUTH_USERS[0]; // Default to Akbar Hussain (CTO) session
+    // Secure default: if no session in localStorage, stay logged out on LoginScreen
+    return null;
   });
 
   // Modal states for Auth, Profile & 2FA
@@ -96,12 +97,18 @@ export const AuthProvider = ({ children }) => {
       .then(res => {
         if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
           setUsers(res.data);
-          // Refresh current user from updated remote record
-          if (currentUser) {
-            const freshCurrent = res.data.find(u => u.id === currentUser.id);
-            if (freshCurrent) {
-              setCurrentUser(freshCurrent);
-              localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(freshCurrent));
+          // Only refresh current user if active session exists in localStorage
+          const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              const freshCurrent = res.data.find(u => u.id === parsed.id);
+              if (freshCurrent) {
+                setCurrentUser(freshCurrent);
+                localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(freshCurrent));
+              }
+            } catch (e) {
+              console.warn('Sync user error:', e);
             }
           }
         }
@@ -211,7 +218,13 @@ export const AuthProvider = ({ children }) => {
 
   // Sign out
   const logout = () => {
-    setSessionUser(null);
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn('Logout cleanup error:', e);
+    }
   };
 
   // Change Password from Profile

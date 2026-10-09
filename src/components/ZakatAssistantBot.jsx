@@ -48,13 +48,14 @@ export const ZakatAssistantBot = () => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       text: `Hello! I am your **Zakat Assistant**.
 
-You can ask me anything about the system data:
-• Ask for a **Yearly Report** to see multi-year comparisons (2020 to 2026).
-• Search for any **Person or Record** (e.g., "Tell me about Basit Khan" or "Status of BEN-01").
-• Check **Pending Payments** or **School Fees**.
-• Check **Food & Ration Kits** or **Bank Account Balances**.
+You can ask me detailed financial questions in English or Hinglish:
+• **Specific Year Status:** "2026 me kitna diye kitna nahi diye?" or "2025 total summary"
+• **Year + Category Breakdown:** "2025 me school fees me kitna diye?" or "2024 ration amount"
+• **Multi-Year History:** "Yearly report 2020 to 2026" or "School fees in all years"
+• **Recipient Search:** "Tell me about Basit Khan" or "Status of BEN-01"
+• **Pending Queue & Bank Accounts:** "Who is pending?" or "Bank account balances"
 
-Click any quick button below or type your question!`
+Click any button below or type your question!`
     }
   ]);
 
@@ -80,6 +81,323 @@ Click any quick button below or type your question!`
   // Natural Language & Database Query Engine
   const processQuery = (rawQuery) => {
     const q = rawQuery.toLowerCase().trim();
+
+    // -------------------------------------------------------------
+    // Helper: Extract Year & Category from Query
+    // -------------------------------------------------------------
+    // Match 4-digit years (2018 - 2030) or relative year terms
+    let targetYear = null;
+    const yearMatch = q.match(/\b(20[1-2][0-9])\b/);
+    if (yearMatch) {
+      targetYear = parseInt(yearMatch[1], 10);
+    } else if (q.includes('this year') || q.includes('current year') || q.includes('iss saal') || q.includes('is saal') || q.includes('ye saal')) {
+      targetYear = financialYear;
+    } else if (q.includes('last year') || q.includes('previous year') || q.includes('pichle saal') || q.includes('pichla saal')) {
+      targetYear = financialYear - 1;
+    }
+
+    // Category detection mapping
+    const categoryKeywords = [
+      {
+        key: 'School fees',
+        label: 'School Fees & Education Grants',
+        aliases: ['school', 'fees', 'fee', 'student', 'education', 'taleem', 'padhai', 'tuition', 'scholar', 'scholarship']
+      },
+      {
+        key: 'Ration Amount',
+        label: 'Food & Ration Grocery Kits',
+        aliases: ['ration', 'food', 'grocery', 'kit', 'anaaj', 'rashan', 'kits', 'slum', 'aurangabad ration']
+      },
+      {
+        key: 'Madrasa',
+        label: 'Madrasa & Religious Education',
+        aliases: ['madrasa', 'madarsa', 'daarul falah', 'darul falah', 'hifz', 'quran']
+      },
+      {
+        key: 'Poor Family (Zakat)',
+        label: 'Poor Families Direct Zakat',
+        aliases: ['poor family', 'poor', 'family', 'ghareeb', 'needy', 'miskeen', 'individual', 'poor families', 'zakat poor']
+      },
+      {
+        key: 'Trust / online',
+        label: 'Trust & Institutional Welfare (Mesco, Sahara)',
+        aliases: ['trust', 'online', 'trust / online', 'anjuman', 'mesco', 'sahara', 'institution', 'organisation']
+      },
+      {
+        key: 'Sadqa',
+        label: 'Sadaqah (Voluntary Charity)',
+        aliases: ['sadqa', 'sadaqa', 'sadaqah', 'voluntary', 'charity']
+      },
+      {
+        key: 'Zakat paid from Gulf',
+        label: 'Gulf / Dubai International Zakat Relief',
+        aliases: ['gulf', 'dubai', 'international', 'yemen', 'gaza', 'palestine', 'syria', 'foreign', 'uae']
+      }
+    ];
+
+    const matchedCategoryObj = categoryKeywords.find(cat =>
+      cat.aliases.some(alias => q.includes(alias))
+    );
+
+    // Check if query is asking for paid vs pending (kitna diye vs kitna nahi diye / baki)
+    const isPaidVsPending =
+      q.includes('kitna diye') ||
+      q.includes('kitna diya') ||
+      q.includes('kitna nahi') ||
+      q.includes('kitna baki') ||
+      q.includes('kitna baaki') ||
+      q.includes('kitna bacha') ||
+      q.includes('paid vs pending') ||
+      q.includes('paid vs unpaid') ||
+      q.includes('not paid') ||
+      q.includes('nahi diye') ||
+      q.includes('nahi diya') ||
+      q.includes('baki hai') ||
+      q.includes('baaki hai') ||
+      q.includes('pending') ||
+      (q.includes('diye') && q.includes('baki')) ||
+      (q.includes('paid') && q.includes('due'));
+
+    // Check if query is asking for totals / figures
+    const isAskingForTotal =
+      q.includes('total') ||
+      q.includes('kitna') ||
+      q.includes('hisaab') ||
+      q.includes('hisab') ||
+      q.includes('summary') ||
+      q.includes('report') ||
+      q.includes('status') ||
+      q.includes('detail') ||
+      q.includes('batao') ||
+      q.includes('budget') ||
+      q.includes('amount');
+
+    // -------------------------------------------------------------
+    // CASE 1: SPECIFIC YEAR + SPECIFIC CATEGORY
+    // (e.g. "2025 me school fees me kitna diye", "2026 ration", "how much for madrasa in 2024")
+    // -------------------------------------------------------------
+    if (targetYear && matchedCategoryObj) {
+      const archivedYear = MULTI_YEAR_ARCHIVE.find(y => y.year === targetYear);
+      const archivedCatAmount = archivedYear?.categories?.[matchedCategoryObj.key] ?? null;
+
+      // Also check if there are live distributions in state for this year & category
+      const matchingDistributions = distributions.filter(d => {
+        const yearMatchBool = Number(d.financialYear) === targetYear;
+        const catMatchBool =
+          (d.classification && d.classification.toLowerCase().includes(matchedCategoryObj.key.toLowerCase())) ||
+          (d.classification && matchedCategoryObj.aliases.some(a => d.classification.toLowerCase().includes(a)));
+        return yearMatchBool && catMatchBool;
+      });
+
+      // If active year with live distributions (e.g. 2026)
+      if (matchingDistributions.length > 0) {
+        const totalAllocated = matchingDistributions.reduce((s, d) => s + (Number(d.amountAllocated) || 0), 0);
+        const totalPaid = matchingDistributions.reduce((s, d) => s + (d.paymentStatus === 'Paid' ? (Number(d.amountPaid) || Number(d.amountAllocated) || 0) : 0), 0);
+        const totalPending = totalAllocated - totalPaid;
+        const paidCount = matchingDistributions.filter(d => d.paymentStatus === 'Paid').length;
+        const pendingCount = matchingDistributions.length - paidCount;
+
+        const tableRows = matchingDistributions.map(d => [
+          d.beneficiaryName,
+          formatINR(d.amountAllocated),
+          d.paymentStatus === 'Paid' ? formatINR(d.amountPaid || d.amountAllocated) : '₹0',
+          d.paymentStatus,
+          d.remarks || d.classification || '—'
+        ]);
+
+        return {
+          text: `### 🎯 ${matchedCategoryObj.label} in FY ${targetYear}
+Here is the complete financial breakdown and disbursement status:
+
+- **Total Budget Allocated:** ${formatINR(totalAllocated)}
+- **Amount Disbursed (Paid / Diye):** ${formatINR(totalPaid)} (${paidCount} of ${matchingDistributions.length} completed)
+- **Amount Pending (Nahi Diye / Baaki):** ${formatINR(totalPending)} (${pendingCount} pending)
+- **Execution Rate:** ${totalAllocated > 0 ? formatPercent((totalPaid / totalAllocated) * 100) : '0%'}
+
+#### Individual Beneficiary Disbursements in FY ${targetYear}:`,
+          table: {
+            headers: ['Beneficiary Name', 'Allocated (₹)', 'Paid (₹)', 'Status', 'Notes'],
+            rows: tableRows
+          },
+          footer: totalPending > 0 ? `⚠️ There is still ${formatINR(totalPending)} pending across ${pendingCount} recipient(s).` : `✓ All allocations for this category are 100% disbursed!`
+        };
+      }
+
+      // If historical archive record exists (e.g. 2020-2025)
+      if (archivedCatAmount !== null) {
+        // Build trend comparison table across all 7 years for this category
+        const trendRows = MULTI_YEAR_ARCHIVE.map(y => {
+          const amt = y.categories?.[matchedCategoryObj.key] || 0;
+          const isTarget = y.year === targetYear;
+          return [
+            `${isTarget ? '👉 FY ' + y.year : 'FY ' + y.year}`,
+            formatINR(amt),
+            formatINR(y.grandTotal),
+            y.grandTotal > 0 ? `${((amt / y.grandTotal) * 100).toFixed(1)}%` : '0%',
+            isTarget ? 'Target Year (Audited)' : 'Historical Archive'
+          ];
+        });
+
+        const catSharePercent = archivedYear.grandTotal > 0
+          ? ((archivedCatAmount / archivedYear.grandTotal) * 100).toFixed(1)
+          : '0';
+
+        return {
+          text: `### 🎯 ${matchedCategoryObj.label} in Assessment Year ${targetYear}
+- **Total Disbursed (Kitna Diye):** ${formatINR(archivedCatAmount)}
+- **Pending Balance (Kitna Baaki):** ₹0 (100% Cleared & Closed)
+- **Share of FY ${targetYear} Total Budget:** ${catSharePercent}% of total ${formatINR(archivedYear.grandTotal)}
+- **Fund Pool:** ${targetYear === 2026 ? 'Live Operations' : 'Audited Historical Ledger'}
+
+#### Multi-Year Trend for ${matchedCategoryObj.key} (2020 – 2026):`,
+          table: {
+            headers: ['Year', 'Category Disbursed (₹)', 'Year Grand Total (₹)', 'Budget Share', 'Status'],
+            rows: trendRows
+          },
+          footer: `Historical records for FY ${targetYear} are permanently archived and 100% audited.`
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // CASE 2: SPECIFIC YEAR + PAID VS PENDING (KITNA DIYE / KITNA NAHI DIYE)
+    // (e.g. "2026 me kitna diye kitna nahi diye", "2025 kitna diya kitna baki hai", "2024 total paid")
+    // -------------------------------------------------------------
+    if (targetYear && (isPaidVsPending || isAskingForTotal)) {
+      const archivedYear = MULTI_YEAR_ARCHIVE.find(y => y.year === targetYear);
+      const yearDistributions = distributions.filter(d => Number(d.financialYear) === targetYear);
+
+      // If active year with live distributions in system
+      if (yearDistributions.length > 0) {
+        const totalAllocated = yearDistributions.reduce((s, d) => s + (Number(d.amountAllocated) || 0), 0);
+        const totalPaid = yearDistributions.reduce((s, d) => s + (d.paymentStatus === 'Paid' ? (Number(d.amountPaid) || Number(d.amountAllocated) || 0) : 0), 0);
+        const totalPending = totalAllocated - totalPaid;
+        const paidItems = yearDistributions.filter(d => d.paymentStatus === 'Paid');
+        const pendingItems = yearDistributions.filter(d => d.paymentStatus !== 'Paid');
+
+        // Category breakdown for this year
+        const catMap = {};
+        yearDistributions.forEach(d => {
+          const cat = d.classification || 'Other';
+          if (!catMap[cat]) catMap[cat] = { allocated: 0, paid: 0, pending: 0, count: 0 };
+          const alloc = Number(d.amountAllocated) || 0;
+          const paid = d.paymentStatus === 'Paid' ? (Number(d.amountPaid) || alloc) : 0;
+          catMap[cat].allocated += alloc;
+          catMap[cat].paid += paid;
+          catMap[cat].pending += (alloc - paid);
+          catMap[cat].count += 1;
+        });
+
+        const catRows = Object.entries(catMap).map(([catName, data]) => [
+          catName,
+          formatINR(data.allocated),
+          formatINR(data.paid),
+          formatINR(data.pending),
+          data.allocated > 0 ? `${((data.paid / data.allocated) * 100).toFixed(0)}%` : '0%'
+        ]);
+
+        return {
+          text: `### 📊 Financial Status for FY ${targetYear} (Paid vs Pending)
+Here is the complete calculation of what has been paid vs what is remaining:
+
+- **Total Budget / Allocated:** ${formatINR(totalAllocated)}
+- **Total Paid (Kitna Diye):** ${formatINR(totalPaid)} (${formatPercent((totalPaid / totalAllocated) * 100)})
+- **Total Pending (Kitna Nahi Diye / Baaki):** ${formatINR(totalPending)} (${formatPercent((totalPending / totalAllocated) * 100)})
+- **Completed Payouts:** ${paidItems.length} recipients
+- **Pending Payouts:** ${pendingItems.length} recipients
+
+#### Category-Wise Paid vs Pending Breakdown (FY ${targetYear}):`,
+          table: {
+            headers: ['Category', 'Allocated (₹)', 'Paid / Diye (₹)', 'Pending / Baaki (₹)', '% Cleared'],
+            rows: catRows
+          },
+          footer: totalPending > 0
+            ? `⏳ ${pendingItems.length} payment(s) totalling ${formatINR(totalPending)} are still pending approval or disbursal.`
+            : `✓ All recorded disbursements for FY ${targetYear} are fully paid!`
+        };
+      }
+
+      // If historical year in MULTI_YEAR_ARCHIVE (2020 to 2025)
+      if (archivedYear) {
+        const catRows = Object.entries(archivedYear.categories || {}).map(([catName, amount]) => [
+          catName,
+          formatINR(amount),
+          formatINR(amount), // 100% paid
+          '₹0',             // 0 pending
+          '100% Completed'
+        ]);
+
+        return {
+          text: `### 📊 Audited Financial Statement for Assessment Year ${targetYear}
+In Assessment Year ${targetYear}, all allocated welfare and zakat funds were fully cleared and settled:
+
+- **Total Disbursed (Kitna Diye):** ${formatINR(archivedYear.grandTotal)} (100% Disbursed)
+- **Total Pending (Kitna Nahi Diye / Baaki):** ₹0 (Fully Closed Cycle)
+- **India Zakat Disbursed:** ${formatINR(archivedYear.zakatIndia)}
+- **Gulf / Dubai Zakat Disbursed:** ${formatINR(archivedYear.zakatDubai)}
+- **Sadaqah Disbursed:** ${formatINR(archivedYear.sadqaIndia)}
+
+#### Category-Wise Breakdown for FY ${targetYear}:`,
+          table: {
+            headers: ['Category / Purpose', 'Allocated (₹)', 'Paid / Diye (₹)', 'Pending / Baaki (₹)', 'Status'],
+            rows: catRows
+          },
+          footer: `Note: FY ${targetYear} was fully audited and closed with ₹0 pending liability.`
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // CASE 3: GENERAL SPECIFIC YEAR REPORT (e.g. "2024 report", "2025 details")
+    // -------------------------------------------------------------
+    if (targetYear) {
+      const archivedYear = MULTI_YEAR_ARCHIVE.find(y => y.year === targetYear);
+      if (archivedYear) {
+        const catRows = Object.entries(archivedYear.categories || {}).map(([catName, amount]) => [
+          catName,
+          formatINR(amount)
+        ]);
+
+        return {
+          text: `### 📅 Financial Summary for Assessment Year ${targetYear}
+- **Total Disbursed (Kitna Diye):** ${formatINR(archivedYear.grandTotal)}
+- **India Zakat Pool:** ${formatINR(archivedYear.zakatIndia)}
+- **Gulf / Dubai Zakat Pool:** ${formatINR(archivedYear.zakatDubai)}
+- **Sadaqah Pool:** ${formatINR(archivedYear.sadqaIndia)}
+- **Pending Balance (Kitna Baaki):** ₹0 (Fully Closed Cycle)
+
+#### Category Breakdown for FY ${targetYear}:`,
+          table: {
+            headers: ['Category / Purpose', 'Amount (₹)'],
+            rows: catRows
+          }
+        };
+      }
+    }
+
+    // -------------------------------------------------------------
+    // CASE 4: CATEGORY QUERY WITHOUT YEAR (Show Multi-Year Comparison)
+    // -------------------------------------------------------------
+    if (matchedCategoryObj && (q.includes('all years') || q.includes('multi year') || q.includes('trend') || q.includes('comparison') || q.includes('har saal') || q.includes('history'))) {
+      const trendRows = MULTI_YEAR_ARCHIVE.map(y => {
+        const amt = y.categories?.[matchedCategoryObj.key] || 0;
+        return [
+          `FY ${y.year}`,
+          formatINR(amt),
+          formatINR(y.grandTotal),
+          y.grandTotal > 0 ? `${((amt / y.grandTotal) * 100).toFixed(1)}%` : '0%'
+        ];
+      });
+
+      return {
+        text: `### 📈 Multi-Year History for ${matchedCategoryObj.label} (2020 – 2026)
+Here is the annual expenditure for this category across all recorded assessment cycles:`,
+        table: {
+          headers: ['Assessment Year', 'Category Amount (₹)', 'Year Grand Total (₹)', '% of Annual Budget'],
+          rows: trendRows
+        }
+      };
+    }
 
     // -------------------------------------------------------------
     // 1. MULTI-YEAR / YEARLY BASES REPORT (2020 - 2026)
@@ -120,36 +438,6 @@ Here is the complete year-on-year breakdown of all welfare and education aid:
         },
         footer: `Note: The 2026 cycle is currently active with ${beneficiaries.length} registered beneficiaries.`
       };
-    }
-
-    // -------------------------------------------------------------
-    // 2. SPECIFIC YEAR REPORT (e.g. "2024 report", "2025 details")
-    // -------------------------------------------------------------
-    const yearMatch = q.match(/\b(202[0-9])\b/);
-    if (yearMatch && (q.includes('report') || q.includes('data') || q.includes('summary') || q.includes('hisaab') || q.includes('budget') || q.includes('status') || q.includes('detail'))) {
-      const targetYear = parseInt(yearMatch[1], 10);
-      const archivedYear = MULTI_YEAR_ARCHIVE.find(y => y.year === targetYear);
-
-      if (archivedYear) {
-        const catRows = Object.entries(archivedYear.categories || {}).map(([catName, amount]) => [
-          catName,
-          formatINR(amount)
-        ]);
-
-        return {
-          text: `### 📅 Financial Summary for Assessment Year ${targetYear}
-- **Total Disbursed:** ${formatINR(archivedYear.grandTotal)}
-- **India Zakat:** ${formatINR(archivedYear.zakatIndia)}
-- **Gulf / Dubai Zakat:** ${formatINR(archivedYear.zakatDubai)}
-- **Sadaqah:** ${formatINR(archivedYear.sadqaIndia)}
-
-#### Category Breakdown for FY ${targetYear}:`,
-          table: {
-            headers: ['Category / Purpose', 'Amount (₹)'],
-            rows: catRows
-          }
-        };
-      }
     }
 
     // -------------------------------------------------------------
@@ -461,12 +749,12 @@ Here are some helpful things you can ask me:
   };
 
   const quickPrompts = [
-    { label: '📊 Yearly Report (2020-2026)', query: 'Give yearly bases report' },
-    { label: '⏳ Pending Payments', query: 'Who is pending?' },
-    { label: '📋 Category Summary', query: 'Category summary report' },
-    { label: '🎓 School Fees', query: 'School fees status' },
+    { label: '📊 2026: Paid vs Pending', query: '2026 me kitna diye kitna nahi diye' },
+    { label: '🎓 2025: School Fees', query: '2025 me school fees me kitna diye' },
+    { label: '📦 2026: Ration Amount', query: '2026 ration amount' },
+    { label: '📈 All Years (2020-2026)', query: 'Give yearly bases report' },
+    { label: '⏳ Pending List', query: 'Who is pending?' },
     { label: '🏦 Bank Balances', query: 'Bank account balances' },
-    { label: '📦 Food & Ration Kits', query: 'Ration kits status' },
   ];
 
   return (
