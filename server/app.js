@@ -8,6 +8,8 @@ import { masterRouter } from './routes/masters.js';
 import { auditRouter } from './routes/auditLogs.js';
 import { recycleBinRouter } from './routes/recycleBin.js';
 import { systemRouter } from './routes/system.js';
+import { authRouter } from './routes/auth.js';
+import { userRouter } from './routes/users.js';
 
 export const app = express();
 
@@ -35,6 +37,8 @@ app.use('/api/masters', masterRouter);
 app.use('/api/audit-logs', auditRouter);
 app.use('/api/recycle-bin', recycleBinRouter);
 app.use('/api/system', systemRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/users', userRouter);
 
 // Fallback 404 handler for API routes
 app.use('/api', (req, res) => {

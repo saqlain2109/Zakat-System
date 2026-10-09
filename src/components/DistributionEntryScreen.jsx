@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR } from '../utils/formatters';
 import {
   FilePlus2,
@@ -33,6 +34,8 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
     categories,
     addDistribution
   } = useZakat();
+
+  const { currentUser, isFinance, isCTO, isAdmin } = useAuth();
 
   // Selected beneficiary & search state (defaults to blank so user explicitly selects)
   const [selectedBenId, setSelectedBenId] = useState('');
@@ -127,7 +130,8 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
       return;
     }
 
-    const finalStatus = instantPaid ? 'Paid' : paymentStatus;
+    // Finance users cannot mark as Paid directly; only CTO/Admin can authorize payout
+    const finalStatus = (isFinance ? false : instantPaid) ? 'Paid' : 'Not Paid';
     const newEntry = {
       beneficiaryId: selectedBeneficiary.id,
       beneficiaryName: selectedBeneficiary.fullName,
@@ -145,7 +149,7 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
       auditNotes: selectedBeneficiary.auditNotes
     };
 
-    addDistribution(newEntry);
+    addDistribution(newEntry, currentUser?.name || 'Admin', currentUser?.role || 'admin');
 
     // Reset form fields
     setSelectedBenId('');
@@ -594,15 +598,24 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
 
           {/* Default Payment Status */}
           <div>
-            <label className="block text-slate-700 font-semibold text-xs mb-1">Default Payment Status</label>
-            <select
-              value={paymentStatus}
-              onChange={(e) => setPaymentStatus(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Not Paid">Not Paid (Red / Pending)</option>
-              <option value="Paid">Paid (Immediate Release)</option>
-            </select>
+            <label className="block text-slate-700 font-semibold text-xs mb-1">
+              {isFinance ? 'Authorization Workflow' : 'Default Payment Status'}
+            </label>
+            {isFinance ? (
+              <div className="w-full bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Awaiting CTO (Akbar Hussain) Authorization</span>
+              </div>
+            ) : (
+              <select
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Not Paid">Not Paid (Red / Pending)</option>
+                <option value="Paid">Paid (Immediate Release)</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -668,25 +681,45 @@ export const DistributionEntryScreen = ({ setActiveTab }) => {
         {/* Action Buttons */}
         <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-xs text-slate-500">
-            Default creates a <strong>[Not Paid]</strong> entry. Clicking <strong>Mark as Paid</strong> immediately updates category ledger.
+            {isFinance ? (
+              <span className="text-amber-800 font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Finance Policy: Payout will be queued for CTO (Akbar Hussain) authorization before payment release.</span>
+              </span>
+            ) : (
+              <span>Default creates a <strong>[Not Paid]</strong> entry. Clicking <strong>Mark as Paid</strong> immediately releases funds.</span>
+            )}
           </span>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => handleSave(false)}
-              className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors"
-            >
-              Save as Not Paid
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSave(true)}
-              className="flex-1 sm:flex-none px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5"
-            >
-              <Check className="w-4 h-4" />
-              <span>Mark as Paid Immediately</span>
-            </button>
+            {isFinance ? (
+              <button
+                type="button"
+                onClick={() => handleSave(false)}
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Submit for CTO Authorization</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleSave(false)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Save as Not Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSave(true)}
+                  className="flex-1 sm:flex-none px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Mark as Paid Immediately</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

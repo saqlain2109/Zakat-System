@@ -20,7 +20,16 @@ systemRouter.get('/initial-state', (req, res) => {
         multiYearArchive: store.multiYearArchive,
         auditLogs: store.auditLogs,
         recycleBin: store.recycleBin,
-        customAnnualBudget: store.customAnnualBudget
+        customAnnualBudget: store.customAnnualBudget,
+        users: (store.users || []).map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          twoFactorEnabled: !!u.twoFactorEnabled,
+          twoFactorConfiguredAt: u.twoFactorConfiguredAt || null,
+          createdAt: u.createdAt
+        }))
       }
     });
   } catch (err) {

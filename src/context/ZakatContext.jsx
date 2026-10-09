@@ -292,15 +292,29 @@ export const ZakatProvider = ({ children }) => {
   const isBudgetExceeded = totalZakatPaid > plannedAnnualBudget;
   const isAllocationExceeded = totalZakatPlanned > plannedAnnualBudget;
 
+  // Pending Approvals Count for CTO Authorization queue
+  const pendingApprovalCount = useMemo(() => {
+    return distributions.filter(d => d.approvalStatus === 'Pending Approval').length;
+  }, [distributions]);
+
   // --- ACTIONS ---
 
   // 1-Click "Mark as Paid" / "Mark as Not Paid"
-  const toggleDistributionPaid = (distributionId, userName = 'Admin') => {
+  const toggleDistributionPaid = (distributionId, userName = 'Admin', userRole = 'admin') => {
     const item = distributions.find(d => d.id === distributionId);
     if (!item) return;
 
     const isCurrentlyPaid = item.paymentStatus === 'Paid';
     const newStatus = isCurrentlyPaid ? 'Not Paid' : 'Paid';
+
+    // Block finance user from marking an unapproved payout as Paid
+    if (!isCurrentlyPaid && item.approvalStatus && item.approvalStatus !== 'Approved') {
+      if (userRole === 'finance') {
+        alert('This disbursement requires authorization from CTO (Akbar Hussain) before payment can be marked as Paid.');
+        return false;
+      }
+    }
+
     const newAmt = isCurrentlyPaid ? 0 : item.amountAllocated;
     const newDate = isCurrentlyPaid ? null : new Date().toISOString().split('T')[0];
 
@@ -334,24 +348,104 @@ export const ZakatProvider = ({ children }) => {
     );
 
     // Sync with Full-Stack Backend
-    api.toggleDistributionPaid(distributionId).catch(err => {
+    api.toggleDistributionPaid(distributionId, { userName, userRole }).catch(err => {
       console.warn('[API Sync] toggleDistributionPaid note:', err.message);
     });
 
     if (!isCurrentlyPaid) {
       triggerPaidConfetti();
     }
+    return true;
+  };
+
+  // CTO / Admin: Authorize payout request
+  const approveDistribution = (distributionId, userName = 'Akbar Hussain (CTO)', userRole = 'cto') => {
+    const item = distributions.find(d => d.id === distributionId);
+    if (!item) return false;
+
+    const approverName = userName || (userRole === 'cto' ? 'Akbar Hussain (CTO)' : 'Admin');
+    const updated = {
+      ...item,
+      approvalStatus: 'Approved',
+      approvedBy: approverName,
+      approvedAt: new Date().toISOString()
+    };
+
+    setDistributions(prev => prev.map(d => d.id === distributionId ? updated : d));
+
+    logActivity(
+      'APPROVE_PAYOUT',
+      'disbursements',
+      distributionId,
+      `CTO Authorized payout of ₹${(Number(item.amountAllocated) || 0).toLocaleString('en-IN')} for ${item.beneficiaryName}`,
+      { approvalStatus: item.approvalStatus || 'Pending Approval' },
+      { approvalStatus: 'Approved', approvedBy: approverName },
+      approverName,
+      [{ field: 'Approval Status', from: item.approvalStatus || 'Pending Approval', to: 'Approved' }]
+    );
+
+    api.approveDistribution(distributionId, { userName: approverName, userRole }).catch(err => {
+      console.warn('[API Sync] approveDistribution note:', err.message);
+    });
+
+    triggerPaidConfetti();
+    return true;
+  };
+
+  // CTO / Admin: Reject payout request
+  const rejectDistribution = (distributionId, reason = 'Declined by CTO', userName = 'Akbar Hussain (CTO)', userRole = 'cto') => {
+    const item = distributions.find(d => d.id === distributionId);
+    if (!item) return false;
+
+    const rejecterName = userName || (userRole === 'cto' ? 'Akbar Hussain (CTO)' : 'Admin');
+    const updated = {
+      ...item,
+      approvalStatus: 'Rejected',
+      rejectedBy: rejecterName,
+      rejectedAt: new Date().toISOString(),
+      rejectionReason: reason
+    };
+
+    setDistributions(prev => prev.map(d => d.id === distributionId ? updated : d));
+
+    logActivity(
+      'REJECT_PAYOUT',
+      'disbursements',
+      distributionId,
+      `Declined payout request for ${item.beneficiaryName}: ${reason}`,
+      { approvalStatus: item.approvalStatus || 'Pending Approval' },
+      { approvalStatus: 'Rejected', rejectedBy: rejecterName },
+      rejecterName,
+      [{ field: 'Approval Status', from: item.approvalStatus || 'Pending Approval', to: 'Rejected' }]
+    );
+
+    api.rejectDistribution(distributionId, { userName: rejecterName, userRole, reason }).catch(err => {
+      console.warn('[API Sync] rejectDistribution note:', err.message);
+    });
+
+    return true;
   };
 
   // Add Distribution
-  const addDistribution = (entry, userName = 'Admin') => {
+  const addDistribution = (entry, userName = 'Admin', userRole = 'admin') => {
     const newId = `DIST-${entry.financialYear}-${String(Date.now()).slice(-4)}`;
+    const isFinanceUser = userRole === 'finance';
+    const isCtoOrAdmin = userRole === 'cto' || userRole === 'admin';
+
+    // If submitted by Finance, requires CTO authorization before funds can be marked as Paid
+    const approvalStatus = isFinanceUser ? 'Pending Approval' : (entry.approvalStatus || 'Approved');
+    const isPaid = !isFinanceUser && entry.paymentStatus === 'Paid';
+
     const newRecord = {
       id: newId,
       ...entry,
-      paymentStatus: entry.paymentStatus || 'Not Paid',
-      amountPaid: entry.paymentStatus === 'Paid' ? (entry.amountPaid || entry.amountAllocated) : 0,
-      paidDate: entry.paymentStatus === 'Paid' ? (entry.paidDate || new Date().toISOString().split('T')[0]) : null
+      paymentStatus: isPaid ? 'Paid' : 'Not Paid',
+      amountPaid: isPaid ? (entry.amountPaid || entry.amountAllocated) : 0,
+      paidDate: isPaid ? (entry.paidDate || new Date().toISOString().split('T')[0]) : null,
+      approvalStatus,
+      approvedBy: isCtoOrAdmin ? (userName || 'Akbar Hussain (CTO)') : null,
+      approvedAt: isCtoOrAdmin ? new Date().toISOString() : null,
+      submittedBy: userName || (isFinanceUser ? 'Finance Team' : 'CTO / Admin')
     };
 
     setDistributions(prev => [newRecord, ...prev]);
@@ -376,7 +470,7 @@ export const ZakatProvider = ({ children }) => {
       'CREATE_DISBURSEMENT',
       'disbursements',
       newId,
-      `Allocated ₹${Number(entry.amountAllocated).toLocaleString('en-IN')} to ${entry.beneficiaryName} [${entry.paymentStatus}] for FY ${entry.financialYear}`,
+      `Allocated ₹${Number(entry.amountAllocated).toLocaleString('en-IN')} to ${entry.beneficiaryName} [${newRecord.paymentStatus} / ${approvalStatus}] for FY ${entry.financialYear}`,
       null,
       newRecord,
       userName,
@@ -384,12 +478,17 @@ export const ZakatProvider = ({ children }) => {
         { field: 'Beneficiary', from: '—', to: entry.beneficiaryName },
         { field: 'Amount Allocated', from: '—', to: `₹${Number(entry.amountAllocated).toLocaleString('en-IN')}` },
         { field: 'Category', from: '—', to: entry.classification },
-        { field: 'Status', from: '—', to: entry.paymentStatus }
+        { field: 'Status', from: '—', to: newRecord.paymentStatus },
+        { field: 'Approval Status', from: '—', to: approvalStatus }
       ]
     );
 
     // Sync with Full-Stack Backend
-    api.createDistribution(newRecord).catch(err => {
+    api.createDistribution({
+      ...newRecord,
+      userName,
+      userRole
+    }).catch(err => {
       console.warn('[API Sync] createDistribution note:', err.message);
     });
 
@@ -969,9 +1068,12 @@ export const ZakatProvider = ({ children }) => {
     overallUtilization,
     isBudgetExceeded,
     isAllocationExceeded,
+    pendingApprovalCount,
 
     // Actions
     toggleDistributionPaid,
+    approveDistribution,
+    rejectDistribution,
     addDistribution,
     updateDistribution,
     deleteDistribution,

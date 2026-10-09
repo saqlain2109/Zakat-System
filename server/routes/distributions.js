@@ -36,7 +36,15 @@ distributionRouter.post('/', (req, res) => {
 
     const newId = `DIST-${entry.financialYear || 2026}-${String(Date.now()).slice(-4)}`;
     const numAmt = Number(entry.amountAllocated) || 0;
-    const isPaid = entry.paymentStatus === 'Paid';
+    const isFinanceUser = entry.userRole === 'finance';
+    const isCtoOrAdmin = entry.userRole === 'cto' || entry.userRole === 'admin';
+
+    // If created by Finance team, payout automatically requires CTO approval and cannot be paid immediately
+    const approvalStatus = isFinanceUser
+      ? 'Pending Approval'
+      : (entry.approvalStatus || 'Approved');
+
+    const isPaid = !isFinanceUser && entry.paymentStatus === 'Paid';
 
     const newRecord = {
       id: newId,
@@ -45,6 +53,10 @@ distributionRouter.post('/', (req, res) => {
       paymentStatus: isPaid ? 'Paid' : 'Not Paid',
       amountPaid: isPaid ? (Number(entry.amountPaid) || numAmt) : 0,
       paidDate: isPaid ? (entry.paidDate || new Date().toISOString().split('T')[0]) : null,
+      approvalStatus,
+      approvedBy: isCtoOrAdmin ? (entry.userName || 'Akbar Hussain (CTO)') : null,
+      approvedAt: isCtoOrAdmin ? new Date().toISOString() : null,
+      submittedBy: entry.userName || (isFinanceUser ? 'Finance Team' : 'Akbar Hussain (CTO)'),
       createdAt: new Date().toISOString()
     };
 
@@ -147,7 +159,9 @@ distributionRouter.put('/:id', (req, res) => {
 distributionRouter.patch('/:id/toggle-paid', (req, res) => {
   try {
     const { id } = req.params;
+    const { userName, userRole } = req.body;
     let saved = null;
+    let authError = null;
 
     db.updateStore(store => {
       const idx = store.distributions.findIndex(d => d.id === id);
@@ -156,6 +170,15 @@ distributionRouter.patch('/:id/toggle-paid', (req, res) => {
       const current = store.distributions[idx];
       const isCurrentlyPaid = current.paymentStatus === 'Paid';
       const newStatus = isCurrentlyPaid ? 'Not Paid' : 'Paid';
+
+      // If Finance team tries to mark an unapproved disbursement as Paid, block it
+      if (newStatus === 'Paid' && current.approvalStatus && current.approvalStatus !== 'Approved') {
+        if (userRole === 'finance') {
+          authError = 'This payout requires authorization from CTO (Akbar Hussain) before payment can be released.';
+          return;
+        }
+      }
+
       const newAmt = isCurrentlyPaid ? 0 : Number(current.amountAllocated);
       const newDate = isCurrentlyPaid ? null : new Date().toISOString().split('T')[0];
 
@@ -170,7 +193,7 @@ distributionRouter.patch('/:id/toggle-paid', (req, res) => {
 
       store.auditLogs.unshift({
         id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        userName: req.body.userName || 'Admin',
+        userName: userName || 'Admin',
         actionType: 'PAYMENT_STATUS_CHANGE',
         entityName: 'disbursements',
         recordId: id,
@@ -186,10 +209,105 @@ distributionRouter.patch('/:id/toggle-paid', (req, res) => {
       });
     });
 
+    if (authError) {
+      return res.status(403).json({ success: false, error: authError });
+    }
+
     if (!saved) {
       return res.status(404).json({ success: false, error: 'Disbursement not found' });
     }
     res.json({ success: true, data: saved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/distributions/:id/approve (CTO Authorization)
+distributionRouter.patch('/:id/approve', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userName, userRole } = req.body;
+    let saved = null;
+
+    db.updateStore(store => {
+      const idx = store.distributions.findIndex(d => d.id === id);
+      if (idx === -1) return;
+
+      const current = store.distributions[idx];
+      const approverName = userName || (userRole === 'cto' ? 'Akbar Hussain (CTO)' : 'Admin');
+
+      saved = {
+        ...current,
+        approvalStatus: 'Approved',
+        approvedBy: approverName,
+        approvedAt: new Date().toISOString()
+      };
+      store.distributions[idx] = saved;
+
+      store.auditLogs.unshift({
+        id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        userName: approverName,
+        actionType: 'APPROVE_PAYOUT',
+        entityName: 'disbursements',
+        recordId: id,
+        description: `CTO Authorized payout of ₹${(Number(current.amountAllocated) || 0).toLocaleString('en-IN')} for ${current.beneficiaryName}`,
+        oldValue: { approvalStatus: current.approvalStatus || 'Pending Approval' },
+        newValue: { approvalStatus: 'Approved', approvedBy: approverName },
+        changedFields: [{ field: 'Approval Status', from: current.approvalStatus || 'Pending Approval', to: 'Approved' }],
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    if (!saved) {
+      return res.status(404).json({ success: false, error: 'Disbursement not found' });
+    }
+    res.json({ success: true, message: 'Disbursement authorized successfully by CTO', data: saved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/distributions/:id/reject (CTO Decline)
+distributionRouter.patch('/:id/reject', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userName, userRole, reason } = req.body;
+    let saved = null;
+
+    db.updateStore(store => {
+      const idx = store.distributions.findIndex(d => d.id === id);
+      if (idx === -1) return;
+
+      const current = store.distributions[idx];
+      const rejecterName = userName || (userRole === 'cto' ? 'Akbar Hussain (CTO)' : 'Admin');
+
+      saved = {
+        ...current,
+        approvalStatus: 'Rejected',
+        rejectedBy: rejecterName,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason || 'Declined by CTO'
+      };
+      store.distributions[idx] = saved;
+
+      store.auditLogs.unshift({
+        id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        userName: rejecterName,
+        actionType: 'REJECT_PAYOUT',
+        entityName: 'disbursements',
+        recordId: id,
+        description: `Declined payout request for ${current.beneficiaryName}: ${reason || 'Declined by CTO'}`,
+        oldValue: { approvalStatus: current.approvalStatus || 'Pending Approval' },
+        newValue: { approvalStatus: 'Rejected', rejectedBy: rejecterName },
+        changedFields: [{ field: 'Approval Status', from: current.approvalStatus || 'Pending Approval', to: 'Rejected' }],
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    if (!saved) {
+      return res.status(404).json({ success: false, error: 'Disbursement not found' });
+    }
+    res.json({ success: true, message: 'Disbursement rejected', data: saved });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

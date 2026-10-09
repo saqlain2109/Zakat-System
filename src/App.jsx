@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ZakatProvider } from './context/ZakatContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -12,6 +12,9 @@ import { ReportsScreen } from './components/ReportsScreen';
 import { ZakatAssistantBot } from './components/ZakatAssistantBot';
 import { RecycleBinModal } from './components/RecycleBinModal';
 import { YearManagementModal } from './components/YearManagementModal';
+import { LoginModal } from './components/LoginModal';
+import { TwoFactorSetupModal } from './components/TwoFactorSetupModal';
+import { UserManagementModal } from './components/UserManagementModal';
 import { ShieldCheck } from 'lucide-react';
 
 function MainApp() {
@@ -19,6 +22,15 @@ function MainApp() {
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const {
+    isLoginModalOpen,
+    setIsLoginModalOpen,
+    is2FASetupModalOpen,
+    setIs2FASetupModalOpen,
+    isUserManagementModalOpen,
+    setIsUserManagementModalOpen
+  } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased">
@@ -83,6 +95,24 @@ function MainApp() {
       <YearManagementModal
         isOpen={isYearModalOpen}
         onClose={() => setIsYearModalOpen(false)}
+      />
+
+      {/* Authentication & User Switch Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
+
+      {/* 2-Step Verification (2FA / TOTP) Setup Modal */}
+      <TwoFactorSetupModal
+        isOpen={is2FASetupModalOpen}
+        onClose={() => setIs2FASetupModalOpen(false)}
+      />
+
+      {/* Admin User Management & 2FA Reset Modal */}
+      <UserManagementModal
+        isOpen={isUserManagementModalOpen}
+        onClose={() => setIsUserManagementModalOpen(false)}
       />
 
       {/* Floating Live AI / System Assistant Bot */}

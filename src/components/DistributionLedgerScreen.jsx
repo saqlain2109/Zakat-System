@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatINR, exportToCSV, exportToExcel, printReport } from '../utils/formatters';
 import {
   Receipt,
@@ -19,7 +20,13 @@ import {
   History,
   FileSpreadsheet,
   Printer,
-  ChevronDown
+  ChevronDown,
+  ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
@@ -31,12 +38,13 @@ const DEFAULT_LEDGER_COLUMNS = [
   { id: 'financialYear', label: 'Year', visible: true, width: 'w-20' },
   { id: 'amountAllocated', label: 'Allocated (₹)', visible: true, width: 'text-right' },
   { id: 'amountPaid', label: 'Paid (₹)', visible: true, width: 'text-right' },
-  { id: 'paymentStatus', label: 'Status', visible: true, width: 'text-center' },
+  { id: 'approvalStatus', label: 'CTO Authorization', visible: true, width: 'text-center' },
+  { id: 'paymentStatus', label: 'Payment Status', visible: true, width: 'text-center' },
   { id: 'paymentMethod', label: 'Method', visible: true, width: '' },
   { id: 'sourceAccountName', label: 'Source Account', visible: false, width: '' },
   { id: 'paidDate', label: 'Payment Date', visible: false, width: '' },
   { id: 'remarks', label: 'Remarks / Notes', visible: true, width: '' },
-  { id: 'actions', label: 'Quick Action', visible: true, width: 'text-center w-36' }
+  { id: 'actions', label: 'Quick Action', visible: true, width: 'text-center min-w-[170px]' }
 ];
 
 export const DistributionLedgerScreen = ({ setActiveTab }) => {
@@ -44,18 +52,24 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
     financialYear,
     distributions,
     toggleDistributionPaid,
+    approveDistribution,
+    rejectDistribution,
     deleteDistribution,
     updateDistribution,
     categories,
     fundingAccounts,
-    zakatYears
+    zakatYears,
+    pendingApprovalCount
   } = useZakat();
+
+  const { currentUser, isCTO, isAdmin, isFinance, permissions } = useAuth();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState(financialYear);
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [approvalFilter, setApprovalFilter] = useState('ALL');
 
   // Column Customizer State
   const [columns, setColumns] = useState(DEFAULT_LEDGER_COLUMNS);
@@ -74,13 +88,15 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
     searchQuery.trim() !== '' ||
     selectedYear !== financialYear ||
     categoryFilter !== 'ALL' ||
-    statusFilter !== 'ALL';
+    statusFilter !== 'ALL' ||
+    approvalFilter !== 'ALL';
 
   const clearAllFilters = () => {
     setSearchQuery('');
     setSelectedYear(financialYear);
     setCategoryFilter('ALL');
     setStatusFilter('ALL');
+    setApprovalFilter('ALL');
   };
 
   // Filtered Ledger Rows
@@ -89,6 +105,8 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
       const matchesYear = selectedYear === 'ALL' || item.financialYear === Number(selectedYear);
       const matchesCat = categoryFilter === 'ALL' || item.classification === categoryFilter || item.categoryId === categoryFilter;
       const matchesStatus = statusFilter === 'ALL' || item.paymentStatus === statusFilter;
+      const currentApproval = item.approvalStatus || 'Approved';
+      const matchesApproval = approvalFilter === 'ALL' || currentApproval === approvalFilter;
 
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -97,9 +115,9 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
         (item.remarks && item.remarks.toLowerCase().includes(q)) ||
         (item.sourceAccountName && item.sourceAccountName.toLowerCase().includes(q));
 
-      return matchesYear && matchesCat && matchesStatus && matchesSearch;
+      return matchesYear && matchesCat && matchesStatus && matchesApproval && matchesSearch;
     });
-  }, [distributions, selectedYear, categoryFilter, statusFilter, searchQuery]);
+  }, [distributions, selectedYear, categoryFilter, statusFilter, approvalFilter, searchQuery]);
 
   // Aggregate Totals
   const viewTotals = useMemo(() => {
@@ -119,6 +137,8 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
       'Assessment Year': d.financialYear,
       'Amount Allocated (INR)': d.amountAllocated,
       'Amount Paid (INR)': d.amountPaid,
+      'CTO Authorization': d.approvalStatus || 'Approved',
+      'Authorized By': d.approvedBy || (d.approvalStatus === 'Approved' ? 'Akbar Hussain (CTO)' : '—'),
       'Payment Status': d.paymentStatus,
       'Payment Method': d.paymentMethod,
       'Source Account': d.sourceAccountName,
@@ -278,8 +298,47 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
         </div>
       </div>
 
+      {/* CTO PENDING APPROVAL QUEUE BANNER */}
+      {pendingApprovalCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Clock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-900 text-sm">
+                {pendingApprovalCount} Disbursement Request{pendingApprovalCount > 1 ? 's' : ''} Awaiting CTO Authorization
+              </h4>
+              <p className="text-amber-700 text-[11px] mt-0.5">
+                Submitted by Finance team. Requires Akbar Hussain (CTO) review & approval before payments can be released.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setApprovalFilter('Pending Approval')}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-xs ${
+                approvalFilter === 'Pending Approval'
+                  ? 'bg-amber-600 text-white shadow-amber-900/20'
+                  : 'bg-white hover:bg-amber-100 text-amber-800 border border-amber-300'
+              }`}
+            >
+              Filter Awaiting CTO ({pendingApprovalCount})
+            </button>
+            {approvalFilter === 'Pending Approval' && (
+              <button
+                onClick={() => setApprovalFilter('ALL')}
+                className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-300 text-xs font-semibold"
+              >
+                View All
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* FILTER CONTROLS & CLEAR FILTER BUTTON */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 shadow-xs items-center">
+      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 shadow-xs items-center">
         {/* Search */}
         <div className="relative lg:col-span-2">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -318,6 +377,22 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
           {categories.map(c => (
             <option key={c.id} value={c.name}>{c.name}</option>
           ))}
+        </select>
+
+        {/* CTO Authorization Filter */}
+        <select
+          value={approvalFilter}
+          onChange={(e) => setApprovalFilter(e.target.value)}
+          className={`bg-slate-50 border rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none ${
+            approvalFilter === 'Pending Approval'
+              ? 'border-amber-400 text-amber-800 bg-amber-50/60'
+              : 'border-slate-300 text-slate-800'
+          }`}
+        >
+          <option value="ALL">All Approvals</option>
+          <option value="Approved">✓ Authorized</option>
+          <option value="Pending Approval">⏳ Awaiting CTO ({pendingApprovalCount})</option>
+          <option value="Rejected">✕ Declined</option>
         </select>
 
         {/* Status Filter & Clear Button */}
@@ -368,6 +443,10 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
               ) : (
                 filteredLedger.map(item => {
                   const isPaid = item.paymentStatus === 'Paid';
+                  const currentApp = item.approvalStatus || 'Approved';
+                  const isApproved = currentApp === 'Approved';
+                  const isPending = currentApp === 'Pending Approval';
+                  const isRejected = currentApp === 'Rejected';
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
@@ -412,6 +491,37 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
                           return (
                             <td key={col.id} className="py-3 px-3.5 text-right font-mono font-bold text-emerald-700">
                               {formatINR(item.amountPaid)}
+                            </td>
+                          );
+                        }
+                        if (col.id === 'approvalStatus') {
+                          return (
+                            <td key={col.id} className="py-3 px-3.5 text-center">
+                              <div className="flex flex-col items-center gap-0.5">
+                                {isApproved && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Authorized</span>
+                                  </span>
+                                )}
+                                {isPending && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>Awaiting CTO</span>
+                                  </span>
+                                )}
+                                {isRejected && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title={item.rejectionReason || 'Declined'}>
+                                    <XCircle className="w-3 h-3 text-rose-600" />
+                                    <span>Declined</span>
+                                  </span>
+                                )}
+                                {item.approvedBy && (
+                                  <span className="text-[9px] text-slate-400 font-mono" title={`Authorized by ${item.approvedBy}`}>
+                                    {item.approvedBy.split(' ')[0]}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           );
                         }
@@ -460,18 +570,69 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
                           return (
                             <td key={col.id} className="py-3 px-3.5 text-center">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => toggleDistributionPaid(item.id)}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs ${
-                                    isPaid
-                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                  }`}
-                                  title={isPaid ? "Mark as Not Paid" : "Mark as Paid"}
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>{isPaid ? 'Unmark' : 'Mark Paid'}</span>
-                                </button>
+                                {/* CTO / Admin Direct Authorization for Pending Requests */}
+                                {isPending && permissions.canApprovePayouts ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => approveDistribution(item.id, currentUser?.name, currentUser?.role)}
+                                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1 shadow-2xs"
+                                      title="Authorize this disbursement request as CTO"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Authorize</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const reason = window.prompt(`Reason for declining payout for ${item.beneficiaryName}:`, 'Requires trustee revision');
+                                        if (reason) {
+                                          rejectDistribution(item.id, reason, currentUser?.name, currentUser?.role);
+                                        }
+                                      }}
+                                      className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+                                      title="Decline this payout request"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : isPending && isFinance ? (
+                                  /* Finance user cannot pay until authorized by CTO */
+                                  <button
+                                    disabled
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 cursor-not-allowed flex items-center gap-1 shadow-2xs"
+                                    title="Awaiting CTO (Akbar Hussain) authorization before payment can be executed"
+                                  >
+                                    <Lock className="w-3 h-3 text-amber-600" />
+                                    <span>CTO Pending</span>
+                                  </button>
+                                ) : isRejected ? (
+                                  permissions.canApprovePayouts ? (
+                                    <button
+                                      onClick={() => approveDistribution(item.id, currentUser?.name, currentUser?.role)}
+                                      className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-colors"
+                                      title="Re-authorize declined request"
+                                    >
+                                      Re-Authorize
+                                    </button>
+                                  ) : (
+                                    <span className="text-[11px] text-rose-500 font-semibold italic">Declined</span>
+                                  )
+                                ) : (
+                                  /* Approved payouts - 1-Click Pay/Unmark */
+                                  <button
+                                    onClick={() => toggleDistributionPaid(item.id, currentUser?.name, currentUser?.role)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs ${
+                                      isPaid
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                    }`}
+                                    title={isPaid ? "Mark as Not Paid" : "Mark as Paid"}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>{isPaid ? 'Unmark' : 'Mark Paid'}</span>
+                                  </button>
+                                )}
+
+                                {/* Audit Log / Version History */}
                                 <button
                                   onClick={() => setHistoryRecord({ id: item.id, title: `${item.beneficiaryName} (${item.classification})` })}
                                   className="p-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors"
@@ -479,6 +640,8 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
                                 >
                                   <History className="w-3.5 h-3.5" />
                                 </button>
+
+                                {/* Edit Button */}
                                 <button
                                   onClick={() => setEditingItem({ ...item })}
                                   className="p-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
@@ -486,6 +649,8 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
+
+                                {/* Delete Button */}
                                 <button
                                   onClick={() => setItemToDelete(item)}
                                   className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
@@ -521,7 +686,7 @@ export const DistributionLedgerScreen = ({ setActiveTab }) => {
             </div>
 
             <p className="text-[11px] text-slate-500">
-              Columns ko show/hide karein ya <strong>▲ / ▼</strong> button se order badlein:
+              Toggle checkboxes to show or hide columns, or use <strong>▲ / ▼</strong> buttons to rearrange their display order:
             </p>
 
             <div className="overflow-y-auto space-y-1.5 flex-1 pr-1">

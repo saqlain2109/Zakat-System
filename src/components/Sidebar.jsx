@@ -1,5 +1,6 @@
 import React from 'react';
 import { useZakat } from '../context/ZakatContext';
+import { useAuth } from '../context/AuthContext';
 import { formatCompactINR } from '../utils/formatters';
 import {
   LayoutDashboard,
@@ -11,9 +12,12 @@ import {
   CalendarDays,
   Coins,
   ShieldCheck,
+  ShieldAlert,
   ChevronRight,
   BarChart3,
   Trash2,
+  UserCog,
+  LogIn,
   X
 } from 'lucide-react';
 
@@ -33,6 +37,13 @@ export const Sidebar = ({
     resetToDefaultData,
     recycleBin
   } = useZakat();
+
+  const {
+    currentUser,
+    isAdmin,
+    setIsLoginModalOpen,
+    setIsUserManagementModalOpen
+  } = useAuth();
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', desc: 'Budget & Overview', icon: LayoutDashboard },
@@ -152,6 +163,63 @@ export const Sidebar = ({
             );
           })}
         </nav>
+
+        {/* Active User Identity & 2FA Card */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/80">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                {currentUser?.name ? currentUser.name.charAt(0) : 'U'}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white truncate">
+                  {currentUser?.name || 'User'}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] font-semibold text-blue-400 uppercase">
+                    {currentUser?.role === 'cto' ? 'CTO Akbar' : currentUser?.role === 'admin' ? 'Trustee Admin' : currentUser?.role === 'finance' ? 'Finance' : 'Auditor'}
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  {currentUser?.twoFactorEnabled ? (
+                    <span className="text-[10px] text-emerald-400 flex items-center gap-0.5" title="2-Step Verification Active">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>2FA Active</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-400 flex items-center gap-0.5" title="2-Step Verification Inactive">
+                      <ShieldAlert className="w-3 h-3 text-amber-400" />
+                      <span>No 2FA</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setIsLoginModalOpen(true);
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[10px] shrink-0"
+              title="Switch User / Log In"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setIsUserManagementModalOpen(true);
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border border-purple-800/60 text-[11px] font-semibold transition-colors mt-2"
+            >
+              <UserCog className="w-3.5 h-3.5" />
+              <span>Admin: User Directory & 2FA Reset</span>
+            </button>
+          )}
+        </div>
 
         {/* Bottom Actions */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">

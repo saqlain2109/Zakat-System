@@ -18,17 +18,67 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../data');
 const DB_FILE = path.resolve(DATA_DIR, 'store.json');
 
+// Initialize Default Users
+export const INITIAL_USERS = [
+  {
+    id: 'usr-01',
+    name: 'Akbar Hussain',
+    email: 'akbar@almeezan.org',
+    role: 'cto',
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    twoFactorConfiguredAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'usr-02',
+    name: 'Managing Trustee',
+    email: 'admin@almeezan.org',
+    role: 'admin',
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    twoFactorConfiguredAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'usr-03',
+    name: 'Farheen Accounts',
+    email: 'finance@almeezan.org',
+    role: 'finance',
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    twoFactorConfiguredAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'usr-04',
+    name: 'External Auditor',
+    email: 'auditor@almeezan.org',
+    role: 'viewer',
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    twoFactorConfiguredAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z'
+  }
+];
+
 // Initialize Memory/File Store
 let memStore = null;
 
 function getInitialState() {
   return {
+    users: [...INITIAL_USERS],
     assets: [...INITIAL_ASSETS],
     categories: [...INITIAL_CATEGORIES],
     fundingAccounts: [...INITIAL_FUNDING_ACCOUNTS],
     referencePersons: [...INITIAL_REFERENCE_PERSONS],
     beneficiaries: [...INITIAL_BENEFICIARIES],
-    distributions: [...INITIAL_DISTRIBUTIONS_2026],
+    distributions: INITIAL_DISTRIBUTIONS_2026.map(d => ({
+      ...d,
+      approvalStatus: d.approvalStatus || 'Approved',
+      approvedBy: d.approvedBy || 'Akbar Hussain (CTO)',
+      approvedAt: d.approvedAt || '2026-01-15T10:00:00.000Z'
+    })),
     zakatYears: [...INITIAL_ZAKAT_YEARS],
     multiYearArchive: [...MULTI_YEAR_ARCHIVE],
     auditLogs: [],
@@ -44,7 +94,11 @@ function loadFileStore() {
     }
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      if (!parsed.users || parsed.users.length === 0) {
+        parsed.users = [...INITIAL_USERS];
+      }
+      return parsed;
     }
   } catch (err) {
     console.warn('[DB] Warning loading store.json, using in-memory store:', err.message);
