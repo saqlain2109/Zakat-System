@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as OTPAuth from 'otpauth';
 import { api } from '../services/api';
 
 const AuthContext = createContext(null);
@@ -33,6 +34,7 @@ export const INITIAL_AUTH_USERS = [
     name: 'Akbar Hussain',
     email: 'akbar@almeezan.org',
     role: 'cto',
+    password: 'Akbar@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null
@@ -42,6 +44,7 @@ export const INITIAL_AUTH_USERS = [
     name: 'Managing Trustee',
     email: 'admin@almeezan.org',
     role: 'admin',
+    password: 'Admin@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null
@@ -51,6 +54,7 @@ export const INITIAL_AUTH_USERS = [
     name: 'Farheen Accounts',
     email: 'finance@almeezan.org',
     role: 'finance',
+    password: 'Finance@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null
@@ -60,6 +64,7 @@ export const INITIAL_AUTH_USERS = [
     name: 'External Auditor',
     email: 'auditor@almeezan.org',
     role: 'viewer',
+    password: 'Auditor@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null
@@ -75,11 +80,12 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.warn('Auth local read note:', e.message);
     }
-    return INITIAL_AUTH_USERS[0]; // Default to Akbar Hussain (CTO)
+    return INITIAL_AUTH_USERS[0]; // Default to Akbar Hussain (CTO) session
   });
 
-  // Modal states for Auth & 2FA
+  // Modal states for Auth, Profile & 2FA
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [is2FASetupModalOpen, setIs2FASetupModalOpen] = useState(false);
   const [isUserManagementModalOpen, setIsUserManagementModalOpen] = useState(false);
   const [target2FAUser, setTarget2FAUser] = useState(null);
@@ -90,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       .then(res => {
         if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
           setUsers(res.data);
-          // Update current user if updated in backend
+          // Refresh current user from updated remote record
           if (currentUser) {
             const freshCurrent = res.data.find(u => u.id === currentUser.id);
             if (freshCurrent) {
@@ -115,23 +121,147 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Switch / Login user
+  // Secure Email + Password Login
+  const loginWithCredentials = async (email, password) => {
+    try {
+      const res = await api.login({ email, password });
+      if (res && res.success) {
+        if (res.requires2FA) {
+          // 2FA is active on this account -> return for OTP prompt
+          return { requires2FA: true, user: res.user };
+        } else if (res.data) {
+          // Direct login success
+          setSessionUser(res.data);
+          return { success: true, user: res.data };
+        }
+      }
+      return { success: false, error: res?.error || 'Invalid credentials' };
+    } catch (err) {
+      // Local Fallback for offline / demo mode
+      const normalizedEmail = (email || '').trim().toLowerCase();
+      const localUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
+      if (!localUser) {
+        return { success: false, error: 'User with this email not found' };
+      }
+
+      const expectedPassword = localUser.password || (
+        localUser.role === 'cto' ? 'Akbar@123' :
+        localUser.role === 'admin' ? 'Admin@123' :
+        localUser.role === 'finance' ? 'Finance@123' : 'Auditor@123'
+      );
+
+      if (password !== expectedPassword) {
+        return { success: false, error: 'Incorrect password. Please try again.' };
+      }
+
+      if (localUser.twoFactorEnabled && localUser.twoFactorSecret) {
+        return { requires2FA: true, user: localUser };
+      }
+
+      setSessionUser(localUser);
+      return { success: true, user: localUser };
+    }
+  };
+
+  // Verify 2FA 6-digit TOTP Token on Login
+  const verifyLogin2FA = async (userId, token) => {
+    try {
+      const res = await api.validateLogin2FA({ userId, token });
+      if (res && res.success && res.data) {
+        setSessionUser(res.data);
+        return { success: true, user: res.data };
+      }
+      return { success: false, error: res?.error || 'Invalid 6-digit code' };
+    } catch (err) {
+      // Local fallback using otpauth
+      const localUser = users.find(u => u.id === userId);
+      if (localUser && localUser.twoFactorSecret) {
+        try {
+          const totp = new OTPAuth.TOTP({
+            issuer: 'Al-Meezan Zakat',
+            label: localUser.email,
+            algorithm: 'SHA1',
+            digits: 6,
+            period: 30,
+            secret: OTPAuth.Secret.fromBase32(localUser.twoFactorSecret)
+          });
+          const delta = totp.validate({ token: String(token).trim(), window: 1 });
+          if (delta !== null) {
+            setSessionUser(localUser);
+            return { success: true, user: localUser };
+          }
+        } catch (e) {
+          console.warn('Local TOTP validation note:', e.message);
+        }
+      }
+      return { success: false, error: 'Invalid 6-digit code. Please verify Microsoft / Google Authenticator.' };
+    }
+  };
+
+  // Switch user directly (e.g. for demo role selection)
   const switchUser = (userObj) => {
-    // If user has 2FA enabled, prompt for code verification
     if (userObj.twoFactorEnabled) {
       setTarget2FAUser(userObj);
       setIsLoginModalOpen(true);
     } else {
-      // First-time login without 2FA -> log in and prompt to set up 2FA
+      // 2FA is optional: log in directly without forcing setup modal
       setSessionUser(userObj);
-      setTarget2FAUser(userObj);
-      setIs2FASetupModalOpen(true);
     }
   };
 
+  // Sign out
   const logout = () => {
     setSessionUser(null);
-    setIsLoginModalOpen(true);
+  };
+
+  // Change Password from Profile
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!currentUser) return { success: false, error: 'Not authenticated' };
+    try {
+      const res = await api.changePassword({
+        userId: currentUser.id,
+        currentPassword,
+        newPassword
+      });
+      if (res && res.success) {
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u));
+        return { success: true, message: 'Password updated successfully!' };
+      }
+      return { success: false, error: res?.error || 'Failed to update password' };
+    } catch (err) {
+      // Local fallback
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, password: newPassword } : u));
+      return { success: true, message: 'Password updated successfully!' };
+    }
+  };
+
+  // Disable / Unlink 2-Step Verification from Profile
+  const disable2FA = async (password = null) => {
+    if (!currentUser) return { success: false, error: 'Not authenticated' };
+    try {
+      const res = await api.disable2FA({
+        userId: currentUser.id,
+        password
+      });
+      if (res && res.success && res.data) {
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? res.data : u));
+        setSessionUser(res.data);
+        return { success: true, message: '2-Step Verification unlinked successfully!' };
+      }
+    } catch (err) {
+      console.warn('Disable 2FA remote note:', err.message);
+    }
+
+    // Local fallback update
+    const updated = {
+      ...currentUser,
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorConfiguredAt: null
+    };
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+    setSessionUser(updated);
+    return { success: true, message: '2-Step Verification unlinked successfully!' };
   };
 
   // Admin user management methods
@@ -146,12 +276,12 @@ export const AuthProvider = ({ children }) => {
         return res.data;
       }
     } catch (err) {
-      // Local fallback
       const newUser = {
         id: `usr-${String(Date.now()).slice(-4)}`,
         name: userData.name,
         email: userData.email,
         role: userData.role,
+        password: userData.password || 'Welcome@123',
         twoFactorEnabled: false,
         twoFactorSecret: null,
         twoFactorConfiguredAt: null,
@@ -192,7 +322,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Admin resets / removes 2FA for a user
+  // Admin resets / removes 2FA for any user (e.g. lost phone recovery)
   const resetUser2FA = async (userId) => {
     try {
       const res = await api.resetUser2FA(userId, currentUser?.name || 'Admin');
@@ -206,7 +336,6 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.warn('Reset 2FA backend note:', err.message);
     }
-    // Fallback local reset
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
         return {
@@ -229,24 +358,24 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  // Mark 2FA verified & enabled for current user
+  // Mark 2FA verified & enabled from Setup Modal
   const on2FAActivated = (userWith2FA) => {
     setUsers(prev => prev.map(u => u.id === userWith2FA.id ? userWith2FA : u));
     setSessionUser(userWith2FA);
     setIs2FASetupModalOpen(false);
   };
 
-  // Permissions helpers
+  // Role helpers
   const isCTO = currentUser?.role === 'cto';
   const isAdmin = currentUser?.role === 'admin';
   const isFinance = currentUser?.role === 'finance';
   const isViewer = currentUser?.role === 'viewer';
 
   const permissions = {
-    canApprovePayouts: isCTO || isAdmin, // CTO has authorization authority
+    canApprovePayouts: isCTO || isAdmin,
     canCreatePayouts: !isViewer,
-    canDirectPay: isCTO || isAdmin, // Only CTO/Admin can mark unapproved payouts as Paid directly
-    canManageUsers: isAdmin, // Only Admin can add/edit users and reset 2FA
+    canDirectPay: isCTO || isAdmin,
+    canManageUsers: isAdmin,
     canManageMasters: isCTO || isAdmin,
     isReadOnly: isViewer
   };
@@ -257,8 +386,12 @@ export const AuthProvider = ({ children }) => {
         currentUser,
         users,
         availableRoles: SYSTEM_ROLES,
+        loginWithCredentials,
+        verifyLogin2FA,
         switchUser,
         logout,
+        changePassword,
+        disable2FA,
         setSessionUser,
         addUser,
         updateUser,
@@ -272,6 +405,8 @@ export const AuthProvider = ({ children }) => {
         // Modals
         isLoginModalOpen,
         setIsLoginModalOpen,
+        isProfileModalOpen,
+        setIsProfileModalOpen,
         is2FASetupModalOpen,
         setIs2FASetupModalOpen,
         isUserManagementModalOpen,

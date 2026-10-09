@@ -12,25 +12,35 @@ import { ReportsScreen } from './components/ReportsScreen';
 import { ZakatAssistantBot } from './components/ZakatAssistantBot';
 import { RecycleBinModal } from './components/RecycleBinModal';
 import { YearManagementModal } from './components/YearManagementModal';
+import { LoginScreen } from './components/LoginScreen';
 import { LoginModal } from './components/LoginModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { TwoFactorSetupModal } from './components/TwoFactorSetupModal';
 import { UserManagementModal } from './components/UserManagementModal';
 import { ShieldCheck } from 'lucide-react';
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
-  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const {
+    currentUser,
     isLoginModalOpen,
     setIsLoginModalOpen,
+    isProfileModalOpen,
+    setIsProfileModalOpen,
     is2FASetupModalOpen,
     setIs2FASetupModalOpen,
     isUserManagementModalOpen,
     setIsUserManagementModalOpen
   } = useAuth();
+
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // If user is not authenticated, render full-screen login experience
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased">
@@ -101,6 +111,12 @@ function MainApp() {
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
+      />
+
+      {/* User Profile, Password & 2FA Settings Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
       />
 
       {/* 2-Step Verification (2FA / TOTP) Setup Modal */}

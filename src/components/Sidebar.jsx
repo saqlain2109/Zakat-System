@@ -42,6 +42,7 @@ export const Sidebar = ({
     currentUser,
     isAdmin,
     setIsLoginModalOpen,
+    setIsProfileModalOpen,
     setIsUserManagementModalOpen
   } = useAuth();
 
@@ -167,12 +168,19 @@ export const Sidebar = ({
         {/* Active User Identity & 2FA Card */}
         <div className="p-3 border-t border-slate-800 bg-slate-950/80">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+            <div
+              onClick={() => {
+                setIsProfileModalOpen(true);
+                if (setIsOpen) setIsOpen(false);
+              }}
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-90 group"
+              title="Click to view Profile, change password, or manage 2FA"
+            >
+              <div className="w-8 h-8 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-blue-600/50">
                 {currentUser?.name ? currentUser.name.charAt(0) : 'U'}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-white truncate">
+                <div className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
                   {currentUser?.name || 'User'}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -201,7 +209,7 @@ export const Sidebar = ({
                 if (setIsOpen) setIsOpen(false);
               }}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-[10px] shrink-0"
-              title="Switch User / Log In"
+              title="Switch User / Quick Login"
             >
               <LogIn className="w-3.5 h-3.5" />
             </button>

@@ -40,12 +40,9 @@ export const LoginModal = ({ isOpen, onClose }) => {
       // Prompt for 6-digit Authenticator code
       setStep('2fa');
     } else {
-      // Direct login and prompt 2FA setup
+      // 2-Step Verification is optional: log in directly without forcing setup modal
       setSessionUser(u);
       onClose();
-      // Prompt to configure 2FA on first login
-      setTarget2FAUser(u);
-      setIs2FASetupModalOpen(true);
     }
   };
 

@@ -39,6 +39,7 @@ export const Header = ({
     isAdmin,
     isFinance,
     setIsLoginModalOpen,
+    setIsProfileModalOpen,
     setIs2FASetupModalOpen,
     setIsUserManagementModalOpen,
     setTarget2FAUser,
@@ -225,6 +226,18 @@ export const Header = ({
                 </div>
 
                 <div className="py-1">
+                  {/* My Profile & Security (Password, 2FA) */}
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2.5 text-slate-800 font-semibold"
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-600" />
+                    <span>My Profile & Security</span>
+                  </button>
+
                   {/* Switch Account */}
                   <button
                     onClick={() => {
@@ -234,22 +247,7 @@ export const Header = ({
                     className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium"
                   >
                     <User className="w-4 h-4 text-blue-600" />
-                    <span>Switch User / Log In</span>
-                  </button>
-
-                  {/* 2-Step Verification Setup */}
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      setTarget2FAUser(currentUser);
-                      setIs2FASetupModalOpen(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2.5 text-slate-700 font-medium"
-                  >
-                    <KeyRound className="w-4 h-4 text-emerald-600" />
-                    <span>
-                      {currentUser?.twoFactorEnabled ? 'Manage 2-Step Verification' : 'Enable 2-Step Verification (QR)'}
-                    </span>
+                    <span>Switch User / Quick Login</span>
                   </button>
 
                   {/* Admin User Management */}
@@ -262,7 +260,7 @@ export const Header = ({
                       className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2.5 text-purple-700 font-medium bg-purple-50/50"
                     >
                       <Users className="w-4 h-4 text-purple-600" />
-                      <span>Admin: Manage Users & Reset 2FA</span>
+                      <span>Admin: User Directory & 2FA Reset</span>
                     </button>
                   )}
                 </div>

@@ -142,7 +142,19 @@ export const api = {
     body: JSON.stringify({ adminName })
   }),
 
-  // 2-Step Verification (2FA / TOTP)
+  // Authentication & 2-Step Verification (2FA / TOTP)
+  login: (data) => request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  changePassword: (data) => request('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  disable2FA: (data) => request('/auth/disable-2fa', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   setup2FA: (userId) => request('/auth/setup-2fa', {
     method: 'POST',
     body: JSON.stringify({ userId })

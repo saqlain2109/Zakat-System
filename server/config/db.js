@@ -25,6 +25,7 @@ export const INITIAL_USERS = [
     name: 'Akbar Hussain',
     email: 'akbar@almeezan.org',
     role: 'cto',
+    password: 'Akbar@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null,
@@ -35,6 +36,7 @@ export const INITIAL_USERS = [
     name: 'Managing Trustee',
     email: 'admin@almeezan.org',
     role: 'admin',
+    password: 'Admin@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null,
@@ -45,6 +47,7 @@ export const INITIAL_USERS = [
     name: 'Farheen Accounts',
     email: 'finance@almeezan.org',
     role: 'finance',
+    password: 'Finance@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null,
@@ -55,6 +58,7 @@ export const INITIAL_USERS = [
     name: 'External Auditor',
     email: 'auditor@almeezan.org',
     role: 'viewer',
+    password: 'Auditor@123',
     twoFactorEnabled: false,
     twoFactorSecret: null,
     twoFactorConfiguredAt: null,
@@ -97,8 +101,15 @@ function loadFileStore() {
       const parsed = JSON.parse(content);
       if (!parsed.users || parsed.users.length === 0) {
         parsed.users = [...INITIAL_USERS];
+      } else {
+        parsed.users = parsed.users.map(u => {
+          const initMatch = INITIAL_USERS.find(iu => iu.id === u.id || iu.email.toLowerCase() === u.email.toLowerCase());
+          return {
+            ...u,
+            password: u.password || (initMatch ? initMatch.password : 'Welcome@123')
+          };
+        });
       }
-      return parsed;
     }
   } catch (err) {
     console.warn('[DB] Warning loading store.json, using in-memory store:', err.message);
